@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { SessionUser } from "@/lib/types";
+import { InboxBell } from "@/components/InboxFeed";
 
 export function UserMenu({ user, admin = false }: { user: SessionUser; admin?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -14,7 +15,7 @@ export function UserMenu({ user, admin = false }: { user: SessionUser; admin?: b
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
   return (
-    <div ref={ref} className="relative">
+    <div className="flex items-center gap-3"><InboxBell login={user.login} /><div ref={ref} className="relative">
       <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-2 rounded-full border border-border p-0.5 hover:border-fg-subtle" aria-haspopup="menu" aria-expanded={open}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={user.avatar} alt="" width={26} height={26} className="rounded-full" />
@@ -36,6 +37,6 @@ export function UserMenu({ user, admin = false }: { user: SessionUser; admin?: b
           <a href="/api/auth/logout" className="block px-3 py-1.5 text-danger hover:bg-canvas-subtle">Sign out</a>
         </div>
       )}
-    </div>
+    </div></div>
   );
 }

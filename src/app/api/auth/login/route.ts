@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   const params = new URLSearchParams({
     client_id: cfg.clientId,
     redirect_uri: `${origin}/api/auth/callback`,
-    scope: "repo read:user",
+    scope: "repo read:user user:email",
     state,
     allow_signup: "true",
   });

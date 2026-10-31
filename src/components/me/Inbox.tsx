@@ -3,23 +3,33 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Notice } from "@/lib/types";
+import { useInbox } from "@/components/InboxFeed";
 
 type Item = Notice & { orgName: string; orgSlug: string };
 
-export function Inbox({ notices }: { notices: Item[] }) {
+export function Inbox({ notices: initialNotices }: { notices: Item[] }) {
+  const { data } = useInbox();
+  const notices = data?.notices ?? initialNotices;
   const router = useRouter();
   const [open, setOpen] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState("");
   async function mark(id: string, action: "read" | "acknowledge") {
     setBusy(id);
-    await fetch(`/api/me/notices/${id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
-    setBusy(null);
-    router.refresh();
+    setError("");
+    try {
+      const response = await fetch(`/api/me/notices/${id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
+      if (!response.ok) throw new Error("Could not update this notice. Please try again.");
+      window.dispatchEvent(new Event("inbox-updated"));
+      router.refresh();
+    } catch (e) { setError(e instanceof Error ? e.message : "Could not update notice."); }
+    finally { setBusy(null); }
   }
   return (
     <ul className="divide-y divide-border-muted">
+      {error && <li role="alert" className="p-3 text-sm text-danger">{error}</li>}
       {notices.map((n) => (
-        <li key={n.id} className={`px-4 py-3 ${n.status === "sent" ? "bg-accent-muted/40" : ""}`}>
+        <li id={`notice-${n.id}`} key={n.id} className={`scroll-mt-20 px-4 py-3 ${n.status === "sent" ? "bg-accent-muted/40" : ""}`}>
           <div className="flex flex-wrap items-center gap-2 text-[13px]">
             <button onClick={() => { const next = open === n.id ? null : n.id; setOpen(next); if (next && n.status === "sent") mark(n.id, "read"); }} className={`text-left ${n.status === "sent" ? "font-semibold" : ""} text-accent hover:underline`}>{n.subject}</button>
             <span className="text-fg-muted">from {n.orgName} · {n.createdAt.slice(0, 16).replace("T", " ")}</span>

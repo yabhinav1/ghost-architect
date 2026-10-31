@@ -1,3 +1,4 @@
+import { MascotLoader } from "@/components/MascotLoader";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { Suspense } from "react";
@@ -30,7 +31,7 @@ async function SetupBody({ searchParams }: { searchParams: Promise<{ reason?: st
     setup_url: `${origin}/dashboard`,
     public: true,
     request_oauth_on_install: true,
-    default_permissions: { contents: "read", metadata: "read", pull_requests: "read" },
+    default_permissions: { contents: "read", metadata: "read", pull_requests: "read", email_addresses: "read" },
     default_events: [],
   };
 
@@ -54,7 +55,7 @@ async function SetupBody({ searchParams }: { searchParams: Promise<{ reason?: st
 
 export default function SetupPage({ searchParams }: { searchParams: Promise<{ reason?: string }> }) {
   return (
-    <Suspense fallback={<div className="min-h-screen" />}>
+    <Suspense fallback={<MascotLoader />}>
       <SetupBody searchParams={searchParams} />
     </Suspense>
   );

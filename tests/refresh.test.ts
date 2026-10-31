@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -36,6 +36,7 @@ test("forced analysis fetches new commits and the current default branch", async
   const token = "fake-refresh-test-token";
   const first = await analyzeRepo(url, false, undefined, token);
   assert.equal(first.analysedFiles, 1);
+  assert.equal(first.activity?.reduce((sum, day) => sum + day.commits, 0), 1);
   await fs.writeFile(path.join(source, "new.ts"), "export const added = true;\n");
   await fs.writeFile(path.join(source, "main.ts"), "export const version = 2;\n");
   await git(["add", "."]);
@@ -45,6 +46,7 @@ test("forced analysis fetches new commits and the current default branch", async
   const progress: string[] = [];
   const updated = await analyzeRepo(url, true, (p) => progress.push(p.step), token);
   assert.equal(updated.analysedFiles, 2);
+  assert.equal(updated.activity?.reduce((sum, day) => sum + day.commits, 0), 2, "a commit touching two files is counted once");
   assert.match((await fileContent(url, "main.ts")).text, /version = 2/);
   assert.ok(progress.includes("Fetching latest repository changes"));
 
@@ -56,6 +58,17 @@ test("forced analysis fetches new commits and the current default branch", async
   await git(["symbolic-ref", "HEAD", "refs/heads/release"], remote);
   await analyzeRepo(url, true, undefined, token);
   assert.match((await fileContent(url, "main.ts")).text, /version = 3/);
+
+  // Create a history longer than the detailed-list cap in one local git process.
+  const head = await git(["rev-parse", "HEAD"]);
+  const timestamp = Math.floor(Date.now() / 1000);
+  const imported = Array.from({ length: 405 }, (_, i) => `commit refs/heads/release\nmark :${i + 1}\ncommitter Alice <alice@example.test> ${timestamp} +0000\ndata 4\nbulk\nfrom ${i ? `:${i}` : head}\n\n`).join("");
+  const fast = spawnSync("git", ["fast-import", "--quiet"], { cwd: source, env: process.env, input: imported, encoding: "utf8" });
+  assert.equal(fast.status, 0, fast.stderr);
+  await git(["push", "origin", "release"]);
+  const busyRepo = await analyzeRepo(url, true, undefined, token);
+  assert.equal(busyRepo.commits?.length, 400);
+  assert.equal(busyRepo.activity?.reduce((sum, day) => sum + day.commits, 0), 408, "daily totals must include commits beyond the detail cap");
 
   const clone = await ensureClone(url);
   const cloneConfig = await fs.readFile(path.join(clone, ".git", "config"), "utf8");

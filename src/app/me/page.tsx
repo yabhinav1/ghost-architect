@@ -1,9 +1,11 @@
+import { MascotLoader } from "@/components/MascotLoader";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Mark } from "@/components/Mascot";
 import { HandoverWorkspace } from "@/components/me/HandoverWorkspace";
 import { Inbox } from "@/components/me/Inbox";
+import { TransferComposer, WorkTransfers } from "@/components/me/WorkTransfers";
 import { Octicon } from "@/components/ui";
 import { UserMenu } from "@/components/UserMenu";
 import { handoversFor, inboxOf } from "@/lib/org";
@@ -36,6 +38,7 @@ async function Body() {
       </header>
       <main className="mx-auto grid max-w-[1100px] gap-4 px-4 py-6 lg:grid-cols-[1fr_1.4fr]">
         <div className="space-y-4">
+          <TransferComposer organisations={orgs.filter(({ member }) => member.status !== "left").map(({ org }) => ({ id: org.id, name: org.name }))} />
           <section className="card">
             <div className="card-header"><Octicon name="report" className="h-4 w-4 text-fg-muted" />Inbox {unread > 0 && <span className="counter ml-1">{unread} new</span>}</div>
             <Inbox notices={notices} />
@@ -49,6 +52,7 @@ async function Body() {
           </section>
         </div>
         <div className="space-y-4">
+          <WorkTransfers />
           <h2 className="text-[13px] font-semibold uppercase tracking-wide text-fg-muted">Handovers {open.length > 0 && <span className="counter ml-1">{open.length} open</span>}</h2>
           {handovers.map((h) => <HandoverWorkspace key={h.id} handover={h} />)}
           {handovers.length === 0 && <section className="card"><div className="blankslate !py-8"><h3>No handovers</h3><p>When a manager assigns you one, as the person leaving or the one receiving, it appears here with the files, notes and links.</p></div></section>}
@@ -59,5 +63,5 @@ async function Body() {
 }
 
 export default function Me() {
-  return <Suspense fallback={<div className="min-h-screen" />}><Body /></Suspense>;
+  return <Suspense fallback={<MascotLoader />}><Body /></Suspense>;
 }

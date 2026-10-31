@@ -1,3 +1,4 @@
+import { MascotLoader } from "@/components/MascotLoader";
 import fs from "node:fs/promises";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -5,6 +6,7 @@ import { Suspense } from "react";
 import { Mark } from "@/components/Mascot";
 import { Octicon } from "@/components/ui";
 import { UserMenu } from "@/components/UserMenu";
+import { InboxBox } from "@/components/InboxFeed";
 import { list } from "@/lib/db";
 import { cacheDir } from "@/lib/git";
 import { laneSummary } from "@/lib/llm";
@@ -53,6 +55,7 @@ async function Body() {
         </div>
       </header>
       <main className="mx-auto max-w-[1200px] space-y-4 px-4 py-6">
+        <InboxBox />
         <p className="rounded-md border border-border bg-canvas-subtle px-3 py-2 text-[12px] text-fg-muted">Platform view. Organisation contents (repositories, logs, notices, handovers) are confidential to their members. You can open an organisation only after its owner grants support access, and each grant and revoke is audited.</p>
         <section className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-8">
           {[["Organisations", orgs.length], ["Memberships", members.length], ["People", new Set(members.map((m) => m.login)).size], ["Linked repos", repos.length], ["Analyses cached", analyses], ["Notices", notices.length], ["Handovers", handovers.length], ["Open handovers", handovers.filter((h) => h.status === "open").length]].map(([l, v]) => (
@@ -102,5 +105,5 @@ async function Body() {
 }
 
 export default function Admin() {
-  return <Suspense fallback={<div className="min-h-screen" />}><Body /></Suspense>;
+  return <Suspense fallback={<MascotLoader />}><Body /></Suspense>;
 }

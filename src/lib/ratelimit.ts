@@ -8,6 +8,7 @@ type Bucket = number[]; // timestamps of recent hits
 
 const WINDOW_MS = 10 * 60_000;
 const LIMITS = {
+  transfer: { anon: 0, user: 30, global: 300 },
   llm: { anon: 30, user: 90, global: 400 }, // assistant, explain, explain-batch (per file), ask
   analyze: { anon: 10, user: 30, global: 120 }, // clones and git analysis
 } as const;

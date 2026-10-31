@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Mark } from "@/components/Mascot";
 import { UserMenu } from "@/components/UserMenu";
+import { InboxBox } from "@/components/InboxFeed";
 import type { Org, SessionUser } from "@/lib/types";
 
 const TABS = [
@@ -41,7 +42,7 @@ export function OrgShell({ org, role, user, active, children }: { org: Org; role
           </div>
         </div>
       </div>
-      <main className="mx-auto max-w-[1200px] space-y-4 px-4 py-5">{children}</main>
+      <main className="mx-auto max-w-[1200px] space-y-4 px-4 py-5">{active === "" && <InboxBox />}{children}</main>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { MascotLoader } from "@/components/MascotLoader";
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { AnalysisApp } from "@/components/AnalysisApp";
@@ -18,7 +19,7 @@ async function RepoPageBody({ params }: { params: Params }) {
 
 export default function RepoPage({ params }: { params: Params }) {
   return (
-    <Suspense fallback={<div className="min-h-screen" />}>
+    <Suspense fallback={<MascotLoader />}>
       <RepoPageBody params={params} />
     </Suspense>
   );

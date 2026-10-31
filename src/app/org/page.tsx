@@ -1,3 +1,4 @@
+import { MascotLoader } from "@/components/MascotLoader";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -5,6 +6,7 @@ import { Mark } from "@/components/Mascot";
 import { CreateOrgForm } from "@/components/org/forms";
 import { Octicon } from "@/components/ui";
 import { UserMenu } from "@/components/UserMenu";
+import { InboxBox } from "@/components/InboxFeed";
 import { isAdmin, orgsOf } from "@/lib/roles";
 import { getSession } from "@/lib/session";
 
@@ -31,6 +33,7 @@ async function Body() {
         </div>
       </header>
       <main className="mx-auto max-w-[1000px] space-y-4 px-4 py-6">
+        <InboxBox />
         <section className="card">
           <div className="card-header"><Octicon name="people" className="h-4 w-4 text-fg-muted" />Your organisations</div>
           {mine.length === 0 ? (
@@ -61,5 +64,5 @@ async function Body() {
 }
 
 export default function OrgHub() {
-  return <Suspense fallback={<div className="min-h-screen" />}><Body /></Suspense>;
+  return <Suspense fallback={<MascotLoader />}><Body /></Suspense>;
 }

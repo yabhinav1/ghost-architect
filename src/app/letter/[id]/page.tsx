@@ -1,3 +1,4 @@
+import { MascotLoader } from "@/components/MascotLoader";
 import { Suspense } from "react";
 import { get } from "@/lib/db";
 import { NOTICE_TEMPLATES } from "@/lib/org";
@@ -33,5 +34,5 @@ async function Body({ params }: { params: Promise<{ id: string }> }) {
 }
 
 export default function Page({ params }: { params: Promise<{ id: string }> }) {
-  return <Suspense fallback={<main className="min-h-screen" />}><Body params={params} /></Suspense>;
+  return <Suspense fallback={<MascotLoader />}><Body params={params} /></Suspense>;
 }

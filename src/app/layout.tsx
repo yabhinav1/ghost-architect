@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import { AssistantProvider } from "@/components/AssistantProvider";
+import { StartupSplash } from "@/components/StartupSplash";
+import { InboxProvider } from "@/components/InboxFeed";
 import "./globals.css";
 
 const SITE = process.env.APP_URL ?? "https://ghost-architect.onrender.com";
@@ -20,7 +23,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className="h-full">
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col"><StartupSplash /><InboxProvider><AssistantProvider>{children}</AssistantProvider></InboxProvider></body>
     </html>
   );
 }

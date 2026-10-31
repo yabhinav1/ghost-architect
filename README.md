@@ -46,9 +46,19 @@ Sign in from the menu at the top right of the landing page as a **User**, an **O
 
 Routes: `/org` your organisations, `/org/<slug>` overview, `/org/<slug>/activity`, `/org/<slug>/notices`, `/org/<slug>/handovers`, `/org/<slug>/settings`, `/me` inbox and handovers, `/invite/<token>` join, `/letter/<id>` printable notice, `/admin`.
 
-Records (organisations, members, invites, notices, handovers, audit) are JSON documents under `.cache/db/`, mirrored to Upstash when configured.
+Records (organisations, members, invites, notices, handovers, work transfers, audit) are JSON documents under `.cache/db/`, mirrored to Upstash when configured.
 
 Organisation records and their indexes do not expire in Upstash. Startup repairs missing indexes from surviving local records and removes the old expiry from discoverable records. Partial recovery merges local and remote indexes. Configured durable-store failures are reported instead of silently claiming a successful save. This document store supports a single application server; multiple replicas need a shared transactional database. Data already lost from both local storage and Redis cannot be recovered by this repair.
+
+### Inbox notifications and email-addressed work transfers
+
+Every signed-in dashboard has an Inbox messages card, and the user menu includes a notification bell. Notices, incoming handoffs and sender status updates refresh every 30 seconds while the page is visible, on returning to the tab, and after actions. `/me` contains the full inbox, existing assigned handovers and **Transfer unfinished work**.
+
+Send a title, repository URL, optional branch/PR reference and progress/next-step notes to a recipient's **verified GitHub email**. The sender must have write or admin access to the repository. A recipient who has not joined yet sees the pending work after signing in with the matching verified email. Delivery is in-app; this feature does not send SMTP email. Editable organisation git-email fields cannot claim a handoff. Organisation transfers are addressed to one current owner or manager, on behalf of the selected organisation; they are not broadcast to all members. The sender must be a current member. Platform admins cannot browse other people's handoffs.
+
+Recipients can mark read, accept or decline; senders can cancel a pending handoff and see the outcome. Acceptance records responsibility and does not change GitHub ownership or permissions. After acceptance, a separate, explicit **Invite with GitHub write access** action checks the sender's live admin permission and uses their own token. Existing write/admin access is preserved. A GitHub invitation still needs acceptance on GitHub. Failed invitations leave the work handoff intact, with an error and a link to repository access settings.
+
+OAuth sign-in now requests `user:email`; existing users should reconnect. New GitHub App manifests request **Email addresses: read-only**. For an existing GitHub App, update that account permission in GitHub App settings and have users reauthorise. Optional collaborator invitations additionally require a token allowed to manage repository access (GitHub App **Administration: write**, approved by the installation owner); the default read-only repository app does not request this automatically. Users can instead grant access directly on GitHub. GitHub organisation policies may block invitations even for admins. No server-wide GitHub token is used for these operations.
 
 ## Accounts and access
 
@@ -68,11 +78,13 @@ Both modes share the same engine and the same heatmap.
 
 ## Extras
 
-- **Casper, the in-page assistant.** A mascot button on every repo page. He knows the app and the repo, reads any file you ask about before answering, streams replies, and pops up to offer an explanation when you open a red file.
+- **Casper, the site-wide assistant.** The mascot button is available before sign-in and on the dashboard, organisation pages, settings and repository workspaces. Opening it introduces the current page; follow-up questions stream through the configured LLM API. On repository pages it also uses selected-file content, commit evidence and risk context, with repository access checked before reading files. Moving between pages starts a fresh conversation while keeping the panel open if it was open. Invitation tokens and raw page URLs are not sent to the model.
+- **Mascot loading screens.** Casper appears during page loading and repository analysis, with real progress when available. A brief entrance on full page loads dismisses automatically, even if JavaScript is delayed; reduced-motion preferences skip it. Chat and the entrance animation are excluded from printouts.
 - **Guided tour.** Five spotlight steps on the first visit to a repo page: heatmap, modes, who is leaving, the file panel, Casper. Replay from the Tour button in the repo header.
 - **PR risk check.** Paste a pull request number or link: which of its files are orphaned, their scores, and who should review each one instead.
 - **Heatmap PNG.** One button renders the treemap with title and legend to a PNG for a deck or a message.
 - **Per-file sparkline.** Twelve months of commits in the file panel, with departed authors' commits in red.
+- **Daily commit activity.** Repository pages have 7-, 30- and 90-day Chart and Table views, showing commits, active days, contributors and activity from selected leavers. Select a day for recent commit links. Daily totals cover the full scanned history, independently of the 400-entry commit-detail limit. Older cached results are labelled incomplete until refreshed. Dates use Git author timestamps in UTC; these are snapshots, not live GitHub event feeds, and commit counts do not measure completion or individual performance.
 
 - **Risk across your repositories.** The dashboard scans your most recent non-fork repos and shows a tile per repo: bus factor, top owner share, fragile files, and the riskiest path, each labelled fragile, watch, or healthy. One click into the full heatmap.
 - **Handover export.** The handover plan downloads as Markdown, with the generated briefs and evidence links, ready for Notion, Confluence, or a PR description.

@@ -1,3 +1,4 @@
+import { MascotLoader } from "@/components/MascotLoader";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -81,7 +82,7 @@ async function SettingsBody({ searchParams }: { searchParams: Promise<{ cleared?
 
 export default function SettingsPage({ searchParams }: { searchParams: Promise<{ cleared?: string }> }) {
   return (
-    <Suspense fallback={<div className="min-h-screen" />}>
+    <Suspense fallback={<MascotLoader />}>
       <SettingsBody searchParams={searchParams} />
     </Suspense>
   );

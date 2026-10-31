@@ -1,3 +1,4 @@
+import { MascotLoader } from "@/components/MascotLoader";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -30,5 +31,5 @@ async function Body({ params }: { params: Promise<{ token: string }> }) {
 }
 
 export default function Page({ params }: { params: Promise<{ token: string }> }) {
-  return <Suspense fallback={<div className="min-h-screen" />}><Body params={params} /></Suspense>;
+  return <Suspense fallback={<MascotLoader />}><Body params={params} /></Suspense>;
 }

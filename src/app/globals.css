@@ -137,6 +137,25 @@ body {
 @keyframes casper-dot { 0%, 80%, 100% { transform: translateY(0); opacity: 0.4; } 40% { transform: translateY(-4px); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .casper-fab .casper-head, .casper-msg, .casper-typing i { animation: none; } }
 
+/* Casper's entrance and real loading states. No artificial progress percentages. */
+.loader-grid { background-image: radial-gradient(circle, rgba(88,166,255,0.12) 1px, transparent 1px); background-size: 26px 26px; }
+.loader-ghost { animation: mascot-float 2.4s ease-in-out -0.4s infinite; }
+.loader-orbit { animation: loader-orbit 12s linear infinite; }
+.loader-dots i { height: 5px; width: 5px; border-radius: 50%; background: var(--color-accent); animation: casper-dot 1.2s ease-in-out infinite; }
+.loader-dots i:nth-child(2) { animation-delay: 0.15s; }
+.loader-dots i:nth-child(3) { animation-delay: 0.3s; }
+.loader-progress { border: 0; border-radius: 6px; overflow: hidden; background: var(--color-border); accent-color: var(--color-accent); }
+.loader-progress::-webkit-progress-bar { background: var(--color-border); }
+.loader-progress::-webkit-progress-value { background: var(--color-accent); transition: width 180ms ease; }
+.loader-progress::-moz-progress-bar { background: var(--color-accent); }
+.startup-splash { animation: splash-exit 250ms ease 650ms forwards; pointer-events: none; }
+@keyframes loader-orbit { to { transform: rotate(360deg); } }
+@keyframes splash-exit { to { opacity: 0; visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) {
+  .loader-ghost, .loader-orbit, .loader-dots i { animation: none; }
+  .startup-splash { display: none; }
+}
+
 /* ---- Guided tour ---- */
 .tour-hole { box-shadow: 0 0 0 9999px rgba(1, 4, 9, 0.72); outline: 2px solid var(--color-accent); outline-offset: 0; transition: top 320ms cubic-bezier(0.2, 0.8, 0.2, 1), left 320ms cubic-bezier(0.2, 0.8, 0.2, 1), width 320ms cubic-bezier(0.2, 0.8, 0.2, 1), height 320ms cubic-bezier(0.2, 0.8, 0.2, 1); }
 .tour-card { animation: page-in 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both; transition: top 320ms cubic-bezier(0.2, 0.8, 0.2, 1), left 320ms cubic-bezier(0.2, 0.8, 0.2, 1); }

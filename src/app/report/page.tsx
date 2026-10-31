@@ -1,3 +1,4 @@
+import { MascotLoader } from "@/components/MascotLoader";
 import { Suspense } from "react";
 import { authorizeRepo } from "@/lib/access";
 import { loadBriefs } from "@/lib/explain";
@@ -11,7 +12,7 @@ export const instant = false;
 
 export default function Report({ searchParams }: { searchParams: Params }) {
   return (
-    <Suspense fallback={<main className="p-10 font-sans text-[#59636e]">Building report…</main>}>
+    <Suspense fallback={<MascotLoader title="Preparing your report" />}>
       <ReportBody searchParams={searchParams} />
     </Suspense>
   );

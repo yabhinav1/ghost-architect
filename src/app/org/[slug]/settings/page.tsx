@@ -1,3 +1,4 @@
+import { MascotLoader } from "@/components/MascotLoader";
 import { Suspense } from "react";
 import { RenameOrg, SupportAccessToggle } from "@/components/org/forms";
 import { OrgShell } from "@/components/org/OrgShell";
@@ -40,5 +41,5 @@ async function Body({ params }: { params: Params }) {
 }
 
 export default function Page({ params }: { params: Params }) {
-  return <Suspense fallback={<div className="min-h-screen" />}><Body params={params} /></Suspense>;
+  return <Suspense fallback={<MascotLoader />}><Body params={params} /></Suspense>;
 }

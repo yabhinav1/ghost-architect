@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AskGhost } from "@/components/AskGhost";
-import { Assistant } from "@/components/Assistant";
+import { RepositoryAssistantContext } from "@/components/AssistantProvider";
 import { DecayChart } from "@/components/DecayChart";
 import { HandoverPanel } from "@/components/HandoverPanel";
 import { PrCheck } from "@/components/PrCheck";
@@ -12,6 +12,8 @@ import { Tour, type TourStep } from "@/components/Tour";
 import { Treemap } from "@/components/Treemap";
 import { Avatar, Card, Octicon, ShareBar } from "@/components/ui";
 import { Mark } from "@/components/Mascot";
+import { MascotLoader } from "@/components/MascotLoader";
+import { CommitActivity } from "@/components/CommitActivity";
 import { UserMenu } from "@/components/UserMenu";
 import { codeownersText, scoreFilesAt } from "@/lib/insights";
 import { downloadTreemapPng } from "@/lib/treemap-image";
@@ -365,14 +367,7 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
           </div>
         )}
         {loading && progress && (
-          <div className="mb-4 rounded-md border border-border bg-canvas-subtle px-3 py-2 text-[13px]">
-            <div className="flex items-center gap-2">
-              <span className="ghost-pulse inline-block h-2 w-2 rounded-full bg-success" />
-              <span>{progress.step}</span>
-              {progress.total ? <span className="counter">{progress.done} / {progress.total}</span> : null}
-            </div>
-            {progress.total ? <div className="progress mt-2 w-80"><span style={{ width: `${((progress.done ?? 0) / progress.total) * 100}%` }} /></div> : null}
-          </div>
+          <MascotLoader compact title="Casper is exploring this repository" progress={progress} />
         )}
 
         {!analysis && !loading && (
@@ -485,6 +480,8 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
               </Card>
               </div>
 
+              <CommitActivity key={analysis.repoUrl} analysis={analysis} departed={departed} />
+
               <PrCheck repoUrl={analysis.repoUrl} analysis={analysis} scored={scored} departed={departed} onSelect={(p) => { setSelected(p); setBrief(null); setBriefError(null); }} />
 
               {mode === "layoffs" && departed.size > 0 && (
@@ -590,7 +587,7 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
       </main>
 
       {analysis && (
-        <Assistant
+        <RepositoryAssistantContext
           repoUrl={analysis.repoUrl}
           context={{
             mode,

@@ -18,6 +18,14 @@ export type FileStat = {
   timeline: { d: string; a: string }[];
 };
 
+export type DailyActivity = {
+  /** UTC calendar date of the commit's author timestamp. */
+  date: string;
+  commits: number;
+  /** Author email -> commits on this date. Commits are counted once, not once per file. */
+  authors: Record<string, number>;
+};
+
 export type Analysis = {
   repoUrl: string;
   analyzedAt: string;
@@ -30,6 +38,8 @@ export type Analysis = {
   authors: Record<string, { name: string; lines: number; commits: number }>;
   /** most recent commits in the window, newest first, capped */
   commits?: CommitEntry[];
+  /** Daily totals from the full history scan, independent of the detailed commit-list cap. */
+  activity?: DailyActivity[];
 };
 
 export type Scored = FileStat & {
@@ -210,3 +220,30 @@ export type AuditEntry = {
 };
 
 export type CommitEntry = { sha: string; date: string; email: string; name: string; subject: string; files: number };
+
+export type WorkTransfer = {
+  id: string;
+  senderLogin: string;
+  recipientEmail: string;
+  recipientLogin?: string;
+  orgId?: string;
+  orgName?: string;
+  title: string;
+  notes: string;
+  repoUrl: string;
+  branch: string;
+  status: "pending" | "accepted" | "declined" | "cancelled";
+  createdAt: string;
+  updatedAt: string;
+  senderReadAt?: string;
+  recipientReadAt?: string;
+  githubAccess?: "invited" | "already-access";
+};
+
+export type InboxSummary = {
+  notices: (Notice & { orgName: string; orgSlug: string })[];
+  unread: number;
+  items: { id: string; title: string; detail: string; href: string; unread: boolean; at: string }[];
+  transfers: (WorkTransfer & { incoming: boolean })[];
+  emailWarning?: string;
+};

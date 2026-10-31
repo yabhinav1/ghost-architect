@@ -1,3 +1,4 @@
+import { MascotLoader } from "@/components/MascotLoader";
 import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -94,7 +95,7 @@ async function LandingBody({ searchParams }: { searchParams: Promise<{ error?: s
 
 export default function Landing({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   return (
-    <Suspense fallback={<div className="min-h-screen" />}>
+    <Suspense fallback={<MascotLoader />}>
       <LandingBody searchParams={searchParams} />
     </Suspense>
   );

@@ -9,14 +9,14 @@ import { storeEnabled, storeGet, storeSet } from "./store.ts";
  * .cache/db/<collection>/, with an id index per collection. Mirrored to Upstash when configured
  * so records survive redeploys on an ephemeral disk. Not a database; fine for a hackathon product.
  */
-export type Collection = "orgs" | "members" | "invites" | "orgRepos" | "notices" | "handovers" | "audit";
+export type Collection = "orgs" | "members" | "invites" | "orgRepos" | "notices" | "handovers" | "audit" | "workTransfers";
 
 const dir = (c: Collection) => cacheDir("db", c);
 const file = (c: Collection, id: string) => path.join(dir(c), encodeURIComponent(id) + ".json");
 const indexKey = (c: Collection) => `db:${c}:index`;
 const recKey = (c: Collection, id: string) => `db:${c}:${id}`;
 const persistent = { persistent: true };
-const collections: Collection[] = ["orgs", "members", "invites", "orgRepos", "notices", "handovers", "audit"];
+const collections: Collection[] = ["orgs", "members", "invites", "orgRepos", "notices", "handovers", "audit", "workTransfers"];
 
 // The local document store runs on one server. Serialize collection mutations so simultaneous
 // requests cannot overwrite one another's index additions or interleave record writes.
@@ -75,6 +75,20 @@ export async function del(c: Collection, id: string): Promise<void> {
     await storeSet(recKey(c, id), null, persistent);
     await storeSet(indexKey(c), ids, persistent);
     await fs.rm(file(c, id), { force: true });
+  });
+}
+
+/** Read and mutate under the same single-server collection lock. */
+export async function update<T extends { id: string }>(c: Collection, id: string, change: (record: T) => Promise<T> | T): Promise<T | null> {
+  return serial(c, async () => {
+    const current = await get<T>(c, id);
+    if (!current) return null;
+    const next = await change(current);
+    if (next.id !== id) throw new Error("Record ID cannot change.");
+    await storeSet(recKey(c, id), next, persistent);
+    await fs.mkdir(dir(c), { recursive: true });
+    await fs.writeFile(file(c, id), JSON.stringify(next));
+    return next;
   });
 }
 

@@ -6,7 +6,8 @@ import path from "node:path";
 import { HISTORY_YEARS, serverGithubToken } from "./env.ts";
 import { buildImportContext, resolveImports } from "./imports.ts";
 import { storeGet, storeSet } from "./store.ts";
-import type { Analysis, CommitEntry, FileStat, Progress } from "./types.ts";
+import { addDailyCommit } from "./activity.ts";
+import type { Analysis, CommitEntry, DailyActivity, FileStat, Progress } from "./types.ts";
 
 const run = promisify(execFile);
 const CACHE = process.env.GHOST_CACHE_DIR || path.join(/* turbopackIgnore: true */ process.cwd(), ".cache");
@@ -341,11 +342,13 @@ export async function analyzeRepo(repoUrl: string, force = false, onProgress?: O
   }
   let cur: { date: string; email: string; ts: number } | null = null;
   const commits: CommitEntry[] = [];
+  const activity = new Map<string, DailyActivity>();
   let curCommit: CommitEntry | null = null;
   for (const line of history.split("\n")) {
     if (line.startsWith("\u0001")) {
       const [date, email, name, sha, subject] = line.slice(1).split("\u001f");
       cur = { date, email: email.toLowerCase(), ts: Date.parse(date) };
+      addDailyCommit(activity, date, cur.email);
       if (!names.has(cur.email)) names.set(cur.email, name);
       curCommit = commits.length < COMMITS_CAP ? { sha: sha ?? "", date, email: cur.email, name, subject: (subject ?? "").slice(0, 200), files: 0 } : null;
       if (curCommit) commits.push(curCommit);
@@ -444,6 +447,7 @@ export async function analyzeRepo(repoUrl: string, force = false, onProgress?: O
     files,
     authors,
     commits,
+    activity: [...activity.values()].sort((a, b) => a.date.localeCompare(b.date)),
   };
   await fs.mkdir(path.dirname(cachePath), { recursive: true });
   await fs.writeFile(cachePath, JSON.stringify(analysis));

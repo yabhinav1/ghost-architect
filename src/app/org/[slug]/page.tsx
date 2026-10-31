@@ -1,3 +1,4 @@
+import { MascotLoader } from "@/components/MascotLoader";
 import Link from "next/link";
 import { Suspense } from "react";
 import { AddRepoForm, InviteForm, MemberRow, RepoActions } from "@/components/org/forms";
@@ -66,5 +67,5 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
 }
 
 export default function Page({ params }: { params: Params }) {
-  return <Suspense fallback={<div className="min-h-screen" />}><Body params={params} /></Suspense>;
+  return <Suspense fallback={<MascotLoader />}><Body params={params} /></Suspense>;
 }

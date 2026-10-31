@@ -6,6 +6,7 @@ import { Portfolio } from "@/components/Portfolio";
 import { RepoList } from "@/components/RepoList";
 import { Octicon } from "@/components/ui";
 import { UserMenu } from "@/components/UserMenu";
+import { InboxBox } from "@/components/InboxFeed";
 import Loading from "./loading";
 import { relativeTime } from "@/lib/format";
 import { getAppConfig } from "@/lib/app-config";
@@ -49,6 +50,7 @@ async function DashboardBody() {
 
       <main className="mx-auto grid max-w-[1200px] gap-5 px-4 py-5 lg:grid-cols-[280px_1fr]">
         <aside className="stagger space-y-4">
+          <InboxBox />
           <div className="card p-4">
             <div className="flex items-center gap-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -1,3 +1,4 @@
+import { MascotLoader } from "@/components/MascotLoader";
 import { Suspense } from "react";
 import { AnalysisApp } from "@/components/AnalysisApp";
 import { getUser } from "@/lib/session";
@@ -9,7 +10,7 @@ async function AnalysePageBody() {
 
 export default function AnalysePage() {
   return (
-    <Suspense fallback={<div className="min-h-screen" />}>
+    <Suspense fallback={<MascotLoader />}>
       <AnalysePageBody  />
     </Suspense>
   );
