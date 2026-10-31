@@ -1,5 +1,6 @@
 import { analyzeRepo, normalizeRepoUrl } from "@/lib/git";
 import { getSession } from "@/lib/session";
+import { rateLimit, tooMany } from "@/lib/ratelimit";
 import type { Progress } from "@/lib/types";
 
 /**
@@ -7,6 +8,9 @@ import type { Progress } from "@/lib/types";
  * then one {"result": Analysis} or {"error": string} line.
  */
 export async function POST(request: Request) {
+  const signedIn = Boolean(await getSession());
+  const rl = rateLimit(request, "analyze", signedIn);
+  if (!rl.ok) return tooMany(rl, "analyses");
   let body: { repoUrl?: string; force?: boolean };
   try {
     body = await request.json();

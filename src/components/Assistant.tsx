@@ -9,6 +9,7 @@ type Msg = { role: "user" | "assistant"; content: string };
 export type AssistantContext = {
   mode: "layoffs" | "notice";
   selectedFile: string | null;
+  selectedScore?: number;
   departed: string[];
   stats: { files: number; authors: number; redCount: number; orphanPct: number };
   topFiles: Scored[];
@@ -24,6 +25,19 @@ export function Assistant({ repoUrl, context, onOpenFile }: { repoUrl: string; c
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const abort = useRef<AbortController | null>(null);
+
+  // Proactive hint: when a red file is opened, offer to explain it. Once per file per session.
+  const [hint, setHint] = useState<{ file: string; question: string } | null>(null);
+  const hinted = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const f = context.selectedFile;
+    if (!f || open || (context.selectedScore ?? 0) < 60 || hinted.current.has(f)) return;
+    hinted.current.add(f);
+    const short = f.split("/").pop();
+    const t = setTimeout(() => setHint({ file: f, question: `Why is ${short} red, and what should I check before changing it?` }), 900);
+    const t2 = setTimeout(() => setHint(null), 12000);
+    return () => { clearTimeout(t); clearTimeout(t2); };
+  }, [context.selectedFile, context.selectedScore, open]);
 
   // First-visit nudge bubble, once per browser.
   useEffect(() => {
@@ -113,13 +127,27 @@ export function Assistant({ repoUrl, context, onOpenFile }: { repoUrl: string; c
     <>
       {/* floating button */}
       <div className="fixed bottom-5 right-5 z-40 flex flex-col items-end gap-2">
-        <div className={`casper-nudge card max-w-[240px] px-3 py-2 text-[12px] shadow-xl ${nudge && !open ? "is-on" : ""}`} aria-hidden={!nudge || open}>
-          <p className="font-semibold">Hi, I&rsquo;m Casper.</p>
-          <p className="text-fg-muted">New here? Ask me what this repo&rsquo;s heatmap means or what any file does.</p>
+        <div className={`casper-nudge card max-w-[260px] px-3 py-2 text-[12px] shadow-xl ${(hint || nudge) && !open ? "is-on" : ""}`} aria-hidden={!(hint || nudge) || open}>
+          {hint ? (
+            <>
+              <p className="font-semibold">That one&rsquo;s red.</p>
+              <p className="text-fg-muted">Want me to explain why <span className="font-mono text-fg">{hint.file.split("/").pop()}</span> scores high and what to check before touching it?</p>
+              <div className="mt-2 flex gap-1.5">
+                <button onClick={() => { const q = hint.question; setHint(null); setOpen(true); setTimeout(() => send(q), 300); }} className="btn btn-sm btn-primary">Yes, tell me</button>
+                <button onClick={() => setHint(null)} className="btn btn-sm">Not now</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="font-semibold">Hi, I&rsquo;m Casper.</p>
+              <p className="text-fg-muted">New here? Ask me what this repo&rsquo;s heatmap means or what any file does.</p>
+            </>
+          )}
         </div>
         <button
           onClick={() => setOpen((o) => !o)}
           aria-label={open ? "Close Casper" : "Ask Casper"}
+          data-tour="casper"
           className={`casper-fab flex items-center gap-2 rounded-full border border-border bg-canvas-overlay pr-4 pl-1.5 py-1.5 text-[13px] font-semibold shadow-xl ${open ? "is-open" : ""}`}
         >
           <span className="casper-head"><Mascot size={40} /></span>

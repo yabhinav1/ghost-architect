@@ -1,6 +1,7 @@
 import { explainFile } from "@/lib/explain";
 import { LlmError } from "@/lib/llm";
 import { getSession } from "@/lib/session";
+import { rateLimit, tooMany } from "@/lib/ratelimit";
 
 /** Runs the explainer over several files in sequence, streaming one NDJSON line per file. */
 export async function POST(request: Request) {
@@ -14,7 +15,10 @@ export async function POST(request: Request) {
   if (!repoUrl || !files?.length) return Response.json({ error: "repoUrl and files are required" }, { status: 400 });
   if (files.some((f) => f.includes("..") || f.startsWith("/"))) return Response.json({ error: "Invalid file path" }, { status: 400 });
 
-  const token = (await getSession())?.token;
+  const session = await getSession();
+  const token = session?.token;
+  const rl = rateLimit(request, "llm", Boolean(session), Math.min(files.length, 15));
+  if (!rl.ok) return tooMany(rl, "briefs");
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {

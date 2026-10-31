@@ -5,9 +5,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { scoreColor } from "@/lib/score";
 import type { Scored } from "@/lib/types";
 
-type Node = { name: string; file?: Scored; value?: number; children?: Node[] };
+export type Node = { name: string; file?: Scored; value?: number; children?: Node[] };
 
-function buildTree(files: Scored[]): Node {
+export function buildTree(files: Scored[]): Node {
   const root: Node = { name: "repo", children: [] };
   for (const f of files) {
     const parts = f.path.split("/");
@@ -20,6 +20,13 @@ function buildTree(files: Scored[]): Node {
     group.children!.push({ name: parts.slice(1).join("/") || f.path, file: f, value: Math.max(f.lines, 8) });
   }
   return root;
+}
+
+/** Shared layout so the PNG export matches what is on screen. */
+export function layoutFiles(files: Scored[], w: number, h: number) {
+  const root = hierarchy(buildTree(files)).sum((d) => d.value ?? 0);
+  treemap<Node>().size([w, h]).paddingOuter(3).paddingTop(18).paddingInner(2).tile(treemapSquarify)(root);
+  return { groups: (root.children ?? []) as HierarchyRectangularNode<Node>[], leaves: (root.leaves() as HierarchyRectangularNode<Node>[]).filter((d) => d.data.file) };
 }
 
 export function Treemap({ files, selected, onSelect }: { files: Scored[]; selected: string | null; onSelect: (path: string) => void }) {
@@ -40,12 +47,9 @@ export function Treemap({ files, selected, onSelect }: { files: Scored[]; select
 
   // Layout depends only on paths and sizes, so toggling a departed author recolours in place instead of reshuffling.
   const layoutKey = files.map((f) => f.path + ":" + f.lines).join("|");
-  const layout = useMemo(() => {
-    const root = hierarchy(buildTree(files)).sum((d) => d.value ?? 0);
-    treemap<Node>().size([size.w, size.h]).paddingOuter(3).paddingTop(18).paddingInner(2).tile(treemapSquarify)(root);
-    return { groups: (root.children ?? []) as HierarchyRectangularNode<Node>[], leaves: root.leaves() as HierarchyRectangularNode<Node>[] };
+  const layout = useMemo(() => layoutFiles(files, size.w, size.h),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layoutKey, size]);
+    [layoutKey, size]);
 
   const byPath = useMemo(() => new Map(files.map((f) => [f.path, f])), [files]);
 
@@ -73,7 +77,7 @@ export function Treemap({ files, selected, onSelect }: { files: Scored[]; select
           {g.data.name}
         </div>
       ))}
-      {layout.leaves.filter((d) => d.data.file).map((d) => {
+      {layout.leaves.map((d) => {
         const file = byPath.get(d.data.file!.path) ?? d.data.file!;
         const w = d.x1 - d.x0;
         const h = d.y1 - d.y0;

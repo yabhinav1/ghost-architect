@@ -27,3 +27,8 @@ services:
       # PR evidence) get 5000/hour instead of sharing the host's anonymous 60/hour quota.
       - key: GITHUB_TOKEN
         sync: false
+      # Optional: free Upstash Redis keeps analyses and briefs across redeploys (the disk is ephemeral).
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false

@@ -3,6 +3,7 @@ import { gatherEvidence } from "@/lib/explain";
 import { fileContent } from "@/lib/git";
 import { chatJson, extractJson, LlmError } from "@/lib/llm";
 import { getSession } from "@/lib/session";
+import { rateLimit, tooMany } from "@/lib/ratelimit";
 import type { AskResult } from "@/lib/types";
 
 const AskSchema = z.object({
@@ -22,6 +23,9 @@ Rules:
 Respond with ONLY a JSON object: {"answer": "...", "evidence": ["C1"], "status": "documented" | "inferred" | "not_documented"}`;
 
 export async function POST(request: Request) {
+  const signedIn = Boolean(await getSession());
+  const rl = rateLimit(request, "llm", signedIn);
+  if (!rl.ok) return tooMany(rl, "questions");
   let body: { repoUrl?: string; file?: string; question?: string };
   try {
     body = await request.json();

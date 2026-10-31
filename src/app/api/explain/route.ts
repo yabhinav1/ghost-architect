@@ -1,8 +1,12 @@
 import { explainFile } from "@/lib/explain";
 import { LlmError } from "@/lib/llm";
 import { getSession } from "@/lib/session";
+import { rateLimit, tooMany } from "@/lib/ratelimit";
 
 export async function POST(request: Request) {
+  const signedIn = Boolean(await getSession());
+  const rl = rateLimit(request, "llm", signedIn);
+  if (!rl.ok) return tooMany(rl, "briefs");
   let body: { repoUrl?: string; file?: string; departed?: string[] };
   try {
     body = await request.json();

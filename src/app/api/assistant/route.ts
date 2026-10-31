@@ -1,6 +1,7 @@
 import { fileContent, fileHistory, normalizeRepoUrl } from "@/lib/git";
 import { chatStream, LlmError, type ChatMessage } from "@/lib/llm";
 import { getSession } from "@/lib/session";
+import { rateLimit, tooMany } from "@/lib/ratelimit";
 
 type Ctx = {
   mode?: "layoffs" | "notice";
@@ -32,6 +33,9 @@ Rules:
 - When relevant, point to the exact button or panel to click next.`;
 
 export async function POST(request: Request) {
+  const signedIn = Boolean(await getSession());
+  const rl = rateLimit(request, "llm", signedIn);
+  if (!rl.ok) return tooMany(rl, "assistant questions");
   let body: { repoUrl?: string; messages?: ChatMessage[]; context?: Ctx };
   try {
     body = await request.json();
@@ -82,7 +86,6 @@ export async function POST(request: Request) {
 
   const system = `${APP_KNOWLEDGE}\n\n=== CURRENT CONTEXT ===\n${ctxText}`;
   const history = messages.slice(-8).map((m) => ({ role: m.role, content: String(m.content).slice(0, 2000) })) as ChatMessage[];
-  void getSession; // sessions are not required; public repos work anonymously
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({

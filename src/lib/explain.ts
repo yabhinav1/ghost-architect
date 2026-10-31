@@ -4,6 +4,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { cacheDir, fileContent, fileHistory, normalizeRepoUrl, repoKey } from "./git";
 import { ghHeaders } from "./github";
+import { storeGet, storeSet } from "./store";
 import { chatJson, extractJson } from "./llm";
 import type { Brief, BriefResult, Evidence } from "./types";
 
@@ -126,10 +127,15 @@ function briefPath(repoUrl: string, file: string): string {
   return cacheDir("briefs", repoKey(repoUrl), createHash("sha1").update(file).digest("hex").slice(0, 16) + ".json");
 }
 
+function briefKey(repoUrl: string, file: string): string {
+  return `brief:${repoKey(repoUrl)}:${createHash("sha1").update(file).digest("hex").slice(0, 16)}`;
+}
+
 async function saveBrief(repoUrl: string, result: BriefResult): Promise<void> {
   const p = briefPath(repoUrl, result.file);
   await fs.mkdir(path.dirname(p), { recursive: true });
   await fs.writeFile(p, JSON.stringify(result));
+  await storeSet(briefKey(repoUrl, result.file), result);
 }
 
 /** Briefs already generated for these files, for the report page. Missing ones are skipped. */
@@ -139,7 +145,8 @@ export async function loadBriefs(repoUrl: string, files: string[]): Promise<Brie
     try {
       out.push(JSON.parse(await fs.readFile(briefPath(repoUrl, f), "utf8")) as BriefResult);
     } catch {
-      // not generated yet
+      const remote = await storeGet<BriefResult>(briefKey(repoUrl, f));
+      if (remote) out.push(remote);
     }
   }
   return out;

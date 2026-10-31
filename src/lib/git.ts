@@ -3,6 +3,7 @@ import { promisify } from "node:util";
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { storeGet, storeSet } from "./store";
 import type { Analysis, FileStat, Progress } from "./types";
 
 const run = promisify(execFile);
@@ -276,6 +277,16 @@ export async function analyzeRepo(repoUrl: string, force = false, onProgress?: O
     onProgress?.({ step: "Loaded from cache" });
     return JSON.parse(await fs.readFile(cachePath, "utf8")) as Analysis;
   }
+  if (!force) {
+    // Durable copy survives redeploys on hosts with an ephemeral disk.
+    const remote = await storeGet<Analysis>(`analysis:${key}`);
+    if (remote) {
+      onProgress?.({ step: "Loaded from durable cache" });
+      await fs.mkdir(path.dirname(cachePath), { recursive: true });
+      await fs.writeFile(cachePath, JSON.stringify(remote));
+      return remote;
+    }
+  }
 
   const dir = await ensureClone(url, onProgress, token);
   onProgress?.({ step: "Listing files" });
@@ -388,6 +399,7 @@ export async function analyzeRepo(repoUrl: string, force = false, onProgress?: O
   };
   await fs.mkdir(path.dirname(cachePath), { recursive: true });
   await fs.writeFile(cachePath, JSON.stringify(analysis));
+  await storeSet(`analysis:${key}`, analysis);
   onProgress?.({ step: "Done" });
   return analysis;
 }

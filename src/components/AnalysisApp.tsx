@@ -6,11 +6,15 @@ import { AskGhost } from "@/components/AskGhost";
 import { Assistant } from "@/components/Assistant";
 import { DecayChart } from "@/components/DecayChart";
 import { HandoverPanel } from "@/components/HandoverPanel";
+import { PrCheck } from "@/components/PrCheck";
+import { Sparkline } from "@/components/Sparkline";
+import { Tour, type TourStep } from "@/components/Tour";
 import { Treemap } from "@/components/Treemap";
 import { Avatar, Card, Octicon, ShareBar } from "@/components/ui";
 import { Mark } from "@/components/Mascot";
 import { UserMenu } from "@/components/UserMenu";
 import { codeownersText, scoreFilesAt } from "@/lib/insights";
+import { downloadTreemapPng } from "@/lib/treemap-image";
 import { scoreColor, scoreFiles } from "@/lib/score";
 import type { Analysis, Brief, BriefResult, Evidence, Progress, Scored, SessionUser } from "@/lib/types";
 
@@ -22,6 +26,14 @@ const SAMPLE_REPOS = [
   { url: "https://github.com/axios/axios", lang: "JavaScript", color: "#f1e05a", blurb: "Promise-based HTTP client. Many contributors, concentrated ownership." },
 ];
 const EMAIL_RE = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
+const TOUR_KEY = "ga-tour-v1";
+const TOUR: TourStep[] = [
+  { target: "heatmap", title: "The heatmap", body: "One tile per file. Size is lines of code, colour is the Orphaned Criticality Score: how much of the file was written by people who left, times how often it changes, times how many files depend on it. Hover for the factors, click to open." },
+  { target: "modes", title: "Two ways in", body: "Notice period: one engineer is leaving, get a handover plan. Layoffs: many left at once, see the blast radius. Everything below recomputes instantly when you switch." },
+  { target: "leaver", title: "Who is leaving", body: "Type a git email, pick a top owner, upload a CSV, or hit a simulate button to pretend the biggest contributors are gone. Nothing is orphaned until someone is marked departed.", place: "bottom" },
+  { target: "panel", title: "The file panel", body: "Score, the three factors, who owns the lines, and the big one: \u201cWhy does this code exist?\u201d, a brief built from commits and PRs where every claim cites evidence or admits it is undocumented.", place: "left" },
+  { target: "casper", title: "Meet Casper", body: "Stuck? Casper knows this repo and this app. Ask what a file does, why a tile is red, or what to click next. He reads the file before answering.", place: "top" },
+];
 
 function parseDeparted(text: string): string[] {
   return [...new Set((text.match(EMAIL_RE) ?? []).map((e) => e.toLowerCase()))];
@@ -48,6 +60,8 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
   const [lastDay, setLastDay] = useState("");
   const [monthsAgo, setMonthsAgo] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const autoRan = useRef(false);
 
@@ -84,6 +98,30 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
     }, 0);
     return () => clearTimeout(t);
   }, [autoRun, initialRepo]);
+
+  useEffect(() => {
+    if (!analysis) return;
+    if (localStorage.getItem(TOUR_KEY)) return;
+    const t = setTimeout(() => setTourOpen(true), 900);
+    return () => clearTimeout(t);
+  }, [analysis]);
+
+  function closeTour() {
+    localStorage.setItem(TOUR_KEY, "1");
+    setTourOpen(false);
+  }
+
+  async function exportPng() {
+    if (!analysis) return;
+    setExporting(true);
+    try {
+      const slug = repoSlug(analysis.repoUrl);
+      const who = departed.size ? `${departed.size} departed` : "nobody departed";
+      await downloadTreemapPng(scored, { title: `${slug} · orphaned criticality`, subtitle: `${analysis.analysedFiles} files · ${who} · ${asOf ? "as of " + asOf.toLocaleDateString("en-IN", { month: "short", year: "numeric" }) : analysis.analyzedAt.slice(0, 10)}`, filename: `${slug.replace("/", "-")}-heatmap.png` });
+    } finally {
+      setExporting(false);
+    }
+  }
 
   async function analyze(force = false) {
     setLoading(true);
@@ -210,7 +248,7 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
               {loading ? "Analysing…" : "Analyse"}
             </button>
           </form>
-          <div className="segmented">
+          <div className="segmented" data-tour="modes">
             {(["notice", "layoffs"] as Mode[]).map((m) => (
               <button key={m} type="button" aria-pressed={mode === m} onClick={() => { setMode(m); setStillHere(new Set()); setSelected(null); }}>
                 {m === "notice" ? "Notice period" : "Layoffs"}
@@ -237,6 +275,7 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
                 <button onClick={copyShare} className="btn btn-sm"><Octicon name="share" className="h-3.5 w-3.5" />{copied ? "Copied" : "Share"}</button>
                 <button onClick={downloadCodeowners} disabled={departed.size === 0} className="btn btn-sm" title="Proposes a still-here owner for every risky file"><Octicon name="download" className="h-3.5 w-3.5" />CODEOWNERS</button>
                 <a href={reportHref} target="_blank" className="btn btn-sm"><Octicon name="report" className="h-3.5 w-3.5" />Report</a>
+                <button onClick={() => setTourOpen(true)} className="btn btn-sm btn-invisible" title="Guided tour">Tour</button>
                 <button onClick={() => analyze(true)} disabled={loading} className="btn btn-sm btn-invisible" title="Re-clone and re-analyse"><Octicon name="history" className="h-3.5 w-3.5" /></button>
               </span>
             </div>
@@ -318,6 +357,7 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(340px,1fr)]">
             <div className="min-w-0 space-y-4">
               {/* Who is leaving / departed input */}
+              <div data-tour="leaver">
               <Card
                 title={mode === "notice" ? "Who is leaving" : "Who left"}
                 right={
@@ -358,13 +398,16 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
                   )}
                 </div>
               </Card>
+              </div>
 
               {/* Heatmap */}
+              <div data-tour="heatmap">
               <Card
                 title={<span className="flex items-center gap-2"><Octicon name="flame" className="h-4 w-4 text-fg-muted" />Orphaned criticality heatmap</span>}
                 right={
-                  <span className="flex items-center gap-1.5 text-[12px] font-normal text-fg-muted">
-                    safe <i className="inline-block h-2.5 w-16 rounded-sm" style={{ background: `linear-gradient(90deg, ${scoreColor(5)}, ${scoreColor(55)}, ${scoreColor(100)})` }} /> critical
+                  <span className="flex items-center gap-3 text-[12px] font-normal text-fg-muted">
+                    <span className="flex items-center gap-1.5">safe <i className="inline-block h-2.5 w-16 rounded-sm" style={{ background: `linear-gradient(90deg, ${scoreColor(5)}, ${scoreColor(55)}, ${scoreColor(100)})` }} /> critical</span>
+                    <button onClick={exportPng} disabled={exporting || scored.length === 0} className="btn btn-sm" title="Download the heatmap as an image"><Octicon name="download" className="h-3.5 w-3.5" />{exporting ? "Rendering…" : "PNG"}</button>
                   </span>
                 }
               >
@@ -387,6 +430,9 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
                   </div>
                 </div>
               </Card>
+              </div>
+
+              <PrCheck repoUrl={analysis.repoUrl} analysis={analysis} scored={scored} departed={departed} onSelect={(p) => { setSelected(p); setBrief(null); setBriefError(null); }} />
 
               {mode === "layoffs" && departed.size > 0 && (
                 <Card title={<span className="flex items-center gap-2"><Octicon name="history" className="h-4 w-4 text-fg-muted" />Knowledge absorption since they left</span>}>
@@ -398,7 +444,7 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
             </div>
 
             {/* Side panel */}
-            <aside className="min-w-0">
+            <aside className="min-w-0" data-tour="panel">
               {!selectedFile && mode === "notice" && departed.size > 0 && (
                 <HandoverPanel analysis={analysis} repoUrl={repoUrl} email={[...departed][0]} lastDay={lastDay} extraDeparted={new Set()} onSelect={(p) => setSelected(p)} />
               )}
@@ -442,6 +488,11 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
                       <Factor label="Churn" value={String(selectedFile.commits12m)} hint="commits, 12 months" />
                       <Factor label="Load-bearing" value={String(selectedFile.inbound)} hint="files import this" />
                     </dl>
+
+                    <div className="mt-3 flex items-center justify-between rounded-md border border-border-muted bg-canvas-subtle px-2 py-1.5">
+                      <span className="text-[11px] text-fg-muted">Commits per month, red by departed</span>
+                      <Sparkline timeline={selectedFile.timeline ?? []} departed={departed} until={analysis.analyzedAt} />
+                    </div>
 
                     <p className="mt-4 mb-1.5 text-[12px] font-semibold text-fg-muted">Ownership</p>
                     <ShareBar
@@ -491,6 +542,7 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
           context={{
             mode,
             selectedFile: selected,
+            selectedScore: selectedFile?.score ?? 0,
             departed: [...departed],
             stats: { files: analysis.analysedFiles, authors: Object.keys(analysis.authors).length, redCount, orphanPct: totalLines ? Math.round((orphanedLines / totalLines) * 100) : 0 },
             topFiles: scored.slice(0, 10),
@@ -499,6 +551,8 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
           onOpenFile={(p) => { setSelected(p); setBrief(null); setBriefError(null); }}
         />
       )}
+
+      {tourOpen && analysis && <Tour steps={TOUR} onClose={closeTour} />}
 
       <footer className="mx-auto max-w-[1400px] px-4 py-6 text-[12px] text-fg-subtle">
         Blame shows who last edited a line, not who understood it. Scores blend 60% blame with 40% of the last 24 months of commits. Confirm ownership with the team before acting.

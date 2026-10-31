@@ -39,6 +39,12 @@ Both modes share the same engine and the same heatmap.
 
 ## Extras
 
+- **Casper, the in-page assistant.** A mascot button on every repo page. He knows the app and the repo, reads any file you ask about before answering, streams replies, and pops up to offer an explanation when you open a red file.
+- **Guided tour.** Five spotlight steps on the first visit to a repo page: heatmap, modes, who is leaving, the file panel, Casper. Replay from the Tour button in the repo header.
+- **PR risk check.** Paste a pull request number or link: which of its files are orphaned, their scores, and who should review each one instead.
+- **Heatmap PNG.** One button renders the treemap with title and legend to a PNG for a deck or a message.
+- **Per-file sparkline.** Twelve months of commits in the file panel, with departed authors' commits in red.
+
 - **Risk across your repositories.** The dashboard scans your most recent non-fork repos and shows a tile per repo: bus factor, top owner share, fragile files, and the riskiest path, each labelled fragile, watch, or healthy. One click into the full heatmap.
 - **Handover export.** The handover plan downloads as Markdown, with the generated briefs and evidence links, ready for Notion, Confluence, or a PR description.
 
@@ -85,6 +91,9 @@ The app shells out to `git` and writes to `.cache/`, so it needs a real filesyst
 6. **Download CODEOWNERS** and open the report.
 
 ## Safety on a public host
+
+- Per-IP rate limits: 30 model calls and 10 analyses per 10 minutes for anonymous visitors, three times that when signed in. Over the limit returns a clear 429 instead of silently burning the free LLM quota.
+- Optional durable cache: set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (free tier) and analyses and briefs survive redeploys on hosts with an ephemeral disk. Without them the local `.cache/` is the only store.
 
 - Repos over 300 MB (configurable with `MAX_REPO_MB`) are refused. The GitHub API's size field catches them before cloning; a watchdog on the clone itself kills anything that grows past the limit, so the guard holds even when the API is rate-limited.
 - On a shared host like Render, set `GITHUB_TOKEN` to a fine-grained personal access token with public read access. Anonymous GitHub API calls share one 60/hour quota per IP, which other tenants exhaust; a token gives the server 5000/hour for size checks and PR evidence.
