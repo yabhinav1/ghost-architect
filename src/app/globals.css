@@ -1,26 +1,105 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* GitHub Primer dark tokens */
+@theme {
+  --color-canvas: #0d1117;
+  --color-canvas-subtle: #161b22;
+  --color-canvas-inset: #010409;
+  --color-canvas-overlay: #1c2128;
+  --color-border: #30363d;
+  --color-border-muted: #21262d;
+  --color-fg: #e6edf3;
+  --color-fg-muted: #8b949e;
+  --color-fg-subtle: #6e7681;
+  --color-accent: #58a6ff;
+  --color-accent-emphasis: #1f6feb;
+  --color-accent-muted: rgba(56, 139, 253, 0.15);
+  --color-success: #3fb950;
+  --color-success-emphasis: #238636;
+  --color-success-muted: rgba(46, 160, 67, 0.15);
+  --color-attention: #d29922;
+  --color-attention-muted: rgba(187, 128, 9, 0.15);
+  --color-danger: #f85149;
+  --color-danger-emphasis: #da3633;
+  --color-danger-muted: rgba(248, 81, 73, 0.15);
+  --color-done: #a371f7;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+html { color-scheme: dark; }
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
+
+/* Primer-style primitives */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 12px; font-size: 14px; font-weight: 500; line-height: 20px;
+  color: var(--color-fg); background: #21262d; border: 1px solid var(--color-border);
+  border-radius: 6px; cursor: pointer; white-space: nowrap; transition: background 80ms, border-color 80ms;
+}
+.btn:hover:not(:disabled) { background: #30363d; border-color: #8b949e; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-sm { padding: 3px 10px; font-size: 12px; line-height: 18px; }
+.btn-primary { color: #fff; background: var(--color-success-emphasis); border-color: rgba(240, 246, 252, 0.1); }
+.btn-primary:hover:not(:disabled) { background: #2ea043; border-color: rgba(240, 246, 252, 0.1); }
+.btn-invisible { background: transparent; border-color: transparent; color: var(--color-accent); }
+.btn-invisible:hover:not(:disabled) { background: #30363d; border-color: transparent; }
+
+.input {
+  width: 100%; padding: 5px 12px; font-size: 14px; line-height: 20px;
+  color: var(--color-fg); background: var(--color-canvas); border: 1px solid var(--color-border);
+  border-radius: 6px; outline: none; transition: border-color 80ms, box-shadow 80ms;
+}
+.input::placeholder { color: var(--color-fg-subtle); }
+.input:focus { border-color: var(--color-accent); box-shadow: 0 0 0 3px var(--color-accent-muted); }
+
+.card { background: var(--color-canvas); border: 1px solid var(--color-border); border-radius: 6px; }
+.card-header {
+  display: flex; align-items: center; gap: 8px; padding: 8px 16px;
+  background: var(--color-canvas-subtle); border-bottom: 1px solid var(--color-border);
+  border-radius: 6px 6px 0 0; font-weight: 600; font-size: 14px;
+}
+
+.counter {
+  display: inline-block; min-width: 20px; padding: 0 6px; font-size: 12px; font-weight: 500; line-height: 18px;
+  color: var(--color-fg); background: rgba(110, 118, 129, 0.4); border-radius: 2em; text-align: center;
+}
+.label {
+  display: inline-flex; align-items: center; padding: 0 7px; font-size: 12px; font-weight: 500; line-height: 18px;
+  border: 1px solid transparent; border-radius: 2em; white-space: nowrap;
+}
+.label-success { color: var(--color-success); border-color: rgba(63, 185, 80, 0.4); background: var(--color-success-muted); }
+.label-attention { color: var(--color-attention); border-color: rgba(210, 153, 34, 0.4); background: var(--color-attention-muted); }
+.label-danger { color: var(--color-danger); border-color: rgba(248, 81, 73, 0.4); background: var(--color-danger-muted); }
+.label-accent { color: var(--color-accent); border-color: rgba(88, 166, 255, 0.4); background: var(--color-accent-muted); }
+.label-muted { color: var(--color-fg-muted); border-color: var(--color-border); background: transparent; }
+
+.segmented { display: inline-flex; background: var(--color-canvas-subtle); border: 1px solid var(--color-border); border-radius: 6px; padding: 2px; }
+.segmented button { padding: 3px 12px; font-size: 13px; font-weight: 500; line-height: 20px; color: var(--color-fg-muted); border-radius: 4px; }
+.segmented button[aria-pressed="true"] { color: var(--color-fg); background: #30363d; box-shadow: 0 1px 0 rgba(0,0,0,0.3); }
+
+.underline-nav { display: flex; gap: 8px; border-bottom: 1px solid var(--color-border); }
+.underline-nav button { padding: 8px 12px; font-size: 14px; color: var(--color-fg-muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.underline-nav button:hover { color: var(--color-fg); border-bottom-color: #6e7681; }
+.underline-nav button[data-active="true"] { color: var(--color-fg); font-weight: 600; border-bottom-color: #f78166; }
+
+.progress { height: 8px; background: var(--color-border-muted); border-radius: 6px; overflow: hidden; }
+.progress > span { display: block; height: 100%; background: var(--color-success-emphasis); transition: width 400ms ease; }
+
+.blankslate { padding: 48px 32px; text-align: center; }
+.blankslate h3 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+.blankslate p { color: var(--color-fg-muted); }
+
+.ghost-pulse { animation: ghost-pulse 1.6s ease-in-out infinite; }
+@keyframes ghost-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+input[type="range"].slider { accent-color: var(--color-accent); height: 4px; }
+input[type="checkbox"].check { accent-color: var(--color-success-emphasis); }
+kbd { font-family: var(--font-mono); font-size: 11px; padding: 1px 5px; border: 1px solid var(--color-border); border-bottom-width: 2px; border-radius: 4px; background: var(--color-canvas-subtle); color: var(--color-fg-muted); }

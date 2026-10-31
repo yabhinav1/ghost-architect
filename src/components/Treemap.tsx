@@ -55,12 +55,12 @@ export function Treemap({ files, selected, onSelect }: { files: Scored[]; select
   return (
     <div
       ref={ref}
-      className="relative w-full overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950"
+      className="relative w-full overflow-hidden rounded-md border border-border bg-canvas-inset"
       style={{ height: size.h }}
       onMouseLeave={() => setHover(null)}
     >
       {layout.groups.map((g) => (
-        <div key={g.data.name} className="absolute truncate px-1 text-[10px] uppercase tracking-wide text-zinc-500" style={{ left: g.x0, top: g.y0 + 2, width: g.x1 - g.x0 }}>
+        <div key={g.data.name} className="absolute truncate px-1 font-mono text-[10px] text-fg-subtle" style={{ left: g.x0, top: g.y0 + 2, width: g.x1 - g.x0 }}>
           {g.data.name}
         </div>
       ))}
@@ -77,28 +77,28 @@ export function Treemap({ files, selected, onSelect }: { files: Scored[]; select
               const rect = ref.current!.getBoundingClientRect();
               setHover({ file, x: e.clientX - rect.left, y: e.clientY - rect.top });
             }}
-            className={`absolute overflow-hidden text-left transition-[background-color,opacity] duration-500 ease-out hover:opacity-80 ${isSel ? "z-10 ring-2 ring-white" : ""}`}
+            className={`absolute overflow-hidden rounded-[2px] text-left transition-[background-color,opacity] duration-500 ease-out hover:opacity-80 ${isSel ? "z-10 ring-2 ring-accent" : ""}`}
             style={{ left: d.x0, top: d.y0, width: w, height: h, background: scoreColor(file.score) }}
           >
-            {w > 56 && h > 22 && <span className="block truncate px-1 pt-0.5 text-[11px] leading-tight text-white/90">{d.data.name}</span>}
+            {w > 56 && h > 22 && <span className="block truncate px-1 pt-0.5 font-mono text-[11px] leading-tight text-white/90">{d.data.name}</span>}
             {w > 56 && h > 38 && <span className="block px-1 text-[10px] text-white/60">{file.score}</span>}
           </button>
         );
       })}
 
       {hover && (
-        <div className="pointer-events-none absolute z-20 w-60 rounded-md border border-zinc-700 bg-zinc-900/95 p-2 text-xs shadow-xl backdrop-blur" style={{ left: tipLeft, top: tipTop }}>
-          <p className="break-all font-mono text-[11px] text-zinc-100">{hover.file.path}</p>
+        <div className="pointer-events-none absolute z-20 w-60 rounded-md border border-border bg-canvas-overlay p-2 text-xs shadow-xl" style={{ left: tipLeft, top: tipTop }}>
+          <p className="break-all font-mono text-[11px] text-fg">{hover.file.path}</p>
           <div className="mt-1 flex items-baseline gap-2">
             <span className="text-xl font-semibold" style={{ color: scoreColor(Math.max(hover.file.score, 25)) }}>{hover.file.score}</span>
-            <span className="text-zinc-500">orphaned criticality</span>
+            <span className="text-fg-muted">orphaned criticality</span>
           </div>
-          <dl className="mt-1 grid grid-cols-3 gap-1 text-[10px] text-zinc-400">
-            <div><dt>orphan</dt><dd className="text-zinc-200">{Math.round(hover.file.orphanShare * 100)}%</dd></div>
-            <div><dt>commits 12m</dt><dd className="text-zinc-200">{hover.file.commits12m}</dd></div>
-            <div><dt>importers</dt><dd className="text-zinc-200">{hover.file.inbound}</dd></div>
+          <dl className="mt-1 grid grid-cols-3 gap-1 text-[10px] text-fg-muted">
+            <div><dt>orphan</dt><dd className="text-fg">{Math.round(hover.file.orphanShare * 100)}%</dd></div>
+            <div><dt>commits 12m</dt><dd className="text-fg">{hover.file.commits12m}</dd></div>
+            <div><dt>importers</dt><dd className="text-fg">{hover.file.inbound}</dd></div>
           </dl>
-          <p className="mt-1 text-[10px] text-zinc-500">{hover.file.lines} lines · click for details</p>
+          <p className="mt-1 text-[10px] text-fg-subtle">{hover.file.lines} lines · click for details</p>
         </div>
       )}
     </div>

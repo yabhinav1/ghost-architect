@@ -40,11 +40,21 @@ export function scoreFiles(files: FileStat[], departed: Set<string>): Scored[] {
 }
 
 export function scoreColor(score: number): string {
-  // grey -> amber -> red
-  if (score <= 0) return "#2a2a2e";
+  // Primer-style risk ramp: border grey -> attention amber -> danger red
+  if (score <= 0) return "#21262d";
   const t = Math.min(1, score / 100);
-  const r = Math.round(60 + 195 * t);
-  const g = Math.round(60 + 110 * (1 - t) * t * 2);
-  const b = Math.round(70 * (1 - t));
-  return `rgb(${r},${g},${b})`;
+  const stops: [number, [number, number, number]][] = [
+    [0, [33, 38, 45]],
+    [0.25, [110, 84, 20]],
+    [0.55, [187, 128, 9]],
+    [0.8, [218, 54, 51]],
+    [1, [248, 81, 73]],
+  ];
+  let i = 0;
+  while (i < stops.length - 2 && t > stops[i + 1][0]) i++;
+  const [t0, c0] = stops[i];
+  const [t1, c1] = stops[i + 1];
+  const k = (t - t0) / (t1 - t0);
+  const c = c0.map((v, j) => Math.round(v + (c1[j] - v) * k));
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
 }
