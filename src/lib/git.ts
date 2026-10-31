@@ -12,6 +12,7 @@ const BLAME_CONCURRENCY = 8;
 const MAX_BUFFER = 256 * 1024 * 1024;
 /** History window. Keeps the one-pass git log bounded on very large repos. */
 const HISTORY_WINDOW = "3.years";
+const TIMELINE_CAP = 300;
 const MONTH_MS = 30.44 * 24 * 3600 * 1000;
 
 const CODE_EXT = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".py", ".go", ".java", ".rb", ".rs", ".kt", ".cs", ".php"]);
@@ -180,6 +181,7 @@ export async function analyzeRepo(repoUrl: string, force = false, onProgress?: O
   const commits24m = new Map<string, number>();
   const commitAuthors = new Map<string, Record<string, number>>();
   const lastTouched = new Map<string, { date: string; email: string }>();
+  const timelines = new Map<string, { d: string; a: string }[]>();
   const names = new Map<string, string>();
   const authorCommits = new Map<string, number>();
 
@@ -192,6 +194,9 @@ export async function analyzeRepo(repoUrl: string, force = false, onProgress?: O
       if (!names.has(cur.email)) names.set(cur.email, name);
     } else if (line && cur) {
       if (!lastTouched.has(line)) lastTouched.set(line, cur);
+      let tl = timelines.get(line);
+      if (!tl) timelines.set(line, (tl = []));
+      if (tl.length < TIMELINE_CAP) tl.push({ d: cur.date.slice(0, 10), a: cur.email });
       if (cur.ts >= cut12) commits12m.set(line, (commits12m.get(line) ?? 0) + 1);
       if (cur.ts >= cut24) {
         commits24m.set(line, (commits24m.get(line) ?? 0) + 1);
@@ -237,6 +242,7 @@ export async function analyzeRepo(repoUrl: string, force = false, onProgress?: O
       inbound: inbound.get(p) ?? 0,
       lastTouched: lt?.date ?? "",
       lastAuthor: lt?.email ?? "",
+      timeline: timelines.get(p) ?? [],
     });
     for (const [email, n] of Object.entries(b.authors)) {
       const a = (authors[email] ??= { name: names.get(email) ?? email, lines: 0, commits: 0 });

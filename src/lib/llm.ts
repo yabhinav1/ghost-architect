@@ -18,29 +18,49 @@ export function llmConfig() {
   return { baseUrl, apiKey, model };
 }
 
+const MAX_ATTEMPTS = 4;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Free tiers rate-limit by tokens per minute. Groq says how long to wait in the error body. */
+function retryDelayMs(status: number, body: string, headers: Headers, attempt: number): number | null {
+  if (status !== 429 && status < 500) return null;
+  const m = body.match(/try again in\s+([\d.]+)\s*(ms|s)/i);
+  if (m) return Math.ceil(Number(m[1]) * (m[2].toLowerCase() === "ms" ? 1 : 1000)) + 500;
+  const ra = Number(headers.get("retry-after"));
+  if (ra > 0) return ra * 1000 + 500;
+  return Math.min(30000, 2000 * 2 ** attempt);
+}
+
 export async function chatJson(messages: ChatMessage[], opts: { maxTokens?: number } = {}): Promise<{ text: string; model: string }> {
   const { baseUrl, apiKey, model } = llmConfig();
   if (!apiKey) throw new LlmError("LLM_API_KEY is not set. Copy .env.example to .env.local and add a free Groq or Gemini key.", 401);
 
-  const res = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature: 0.2,
-      max_tokens: opts.maxTokens ?? 4000,
-      response_format: { type: "json_object" },
-    }),
-  });
-  if (!res.ok) {
+  let lastErr: LlmError | null = null;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const res = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: 0.2,
+        max_tokens: opts.maxTokens ?? 3000,
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+      const text = data.choices?.[0]?.message?.content ?? "";
+      if (!text) throw new LlmError("LLM returned an empty response", 502);
+      return { text, model };
+    }
     const detail = (await res.text()).slice(0, 500);
-    throw new LlmError(`LLM request failed (${res.status}): ${detail}`, res.status);
+    lastErr = new LlmError(`LLM request failed (${res.status}): ${detail}`, res.status);
+    const wait = retryDelayMs(res.status, detail, res.headers, attempt);
+    if (wait === null || attempt === MAX_ATTEMPTS - 1) break;
+    await sleep(Math.min(wait, 45000));
   }
-  const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-  const text = data.choices?.[0]?.message?.content ?? "";
-  if (!text) throw new LlmError("LLM returned an empty response", 502);
-  return { text, model };
+  throw lastErr!;
 }
 
 /** Pull the first JSON object out of a response, tolerating code fences and chatter. */

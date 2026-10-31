@@ -6,18 +6,19 @@ import { cacheDir, fileContent, fileHistory, normalizeRepoUrl, repoKey } from ".
 import { chatJson, extractJson } from "./llm";
 import type { Brief, BriefResult, Evidence } from "./types";
 
+// Free-tier models sometimes drift from the exact enum ("undocumented", "Documented", "cited").
+// Anything that is not clearly documented is treated as inferred, and a claim with no evidence can never be documented.
+const Status = z.preprocess((v) => (typeof v === "string" && /^doc/i.test(v.trim()) ? "documented" : "inferred"), z.enum(["documented", "inferred"]));
+const Strings = z.preprocess((v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string") : []), z.array(z.string()));
+
 const BriefSchema = z.object({
-  purpose: z.string(),
-  claims: z.array(
-    z.object({
-      claim: z.string(),
-      evidence: z.array(z.string()).default([]),
-      status: z.enum(["documented", "inferred"]),
-    }),
-  ),
-  undocumented: z.array(z.string()).default([]),
-  risks: z.array(z.string()).default([]),
-  safeChangeChecklist: z.array(z.string()).default([]),
+  purpose: z.string().default(""),
+  claims: z
+    .preprocess((v) => (Array.isArray(v) ? v : []), z.array(z.object({ claim: z.string(), evidence: Strings, status: Status })))
+    .transform((claims) => claims.map((c) => (c.evidence.length === 0 && c.status === "documented" ? { ...c, status: "inferred" as const } : c))),
+  undocumented: Strings,
+  risks: Strings,
+  safeChangeChecklist: Strings,
 });
 
 const SYSTEM = `You are Ghost-Architect, a codebase archaeologist. You explain why a file exists to engineers who inherited it after the original authors left.
@@ -61,7 +62,7 @@ async function fetchGithubPr(owner: string, repo: string, n: number): Promise<Ev
       author: pr.user?.login ?? "",
       date: pr.merged_at ?? pr.created_at,
       url: pr.html_url,
-      body: (pr.body ?? "").slice(0, 2500),
+      body: (pr.body ?? "").slice(0, 1000),
     };
   } catch {
     return null;
@@ -70,7 +71,7 @@ async function fetchGithubPr(owner: string, repo: string, n: number): Promise<Ev
 
 export async function gatherEvidence(repoUrl: string, file: string): Promise<Evidence[]> {
   const url = normalizeRepoUrl(repoUrl);
-  const commits = await fileHistory(url, file);
+  const commits = await fileHistory(url, file, 20);
   const evidence: Evidence[] = commits.map((c, i) => ({
     id: `C${i + 1}`,
     kind: "commit",
@@ -78,7 +79,7 @@ export async function gatherEvidence(repoUrl: string, file: string): Promise<Evi
     author: `${c.name} <${c.email}>`,
     date: c.date,
     url: `${url}/commit/${c.sha}`,
-    body: c.body.slice(0, 1500),
+    body: c.body.slice(0, 500),
   }));
 
   const gh = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)$/);
@@ -91,7 +92,7 @@ export async function gatherEvidence(repoUrl: string, file: string): Promise<Evi
 }
 
 export async function explainFile(repoUrl: string, file: string, departed: string[]): Promise<BriefResult> {
-  const [evidence, content] = await Promise.all([gatherEvidence(repoUrl, file), fileContent(repoUrl, file, 400)]);
+  const [evidence, content] = await Promise.all([gatherEvidence(repoUrl, file), fileContent(repoUrl, file, 260)]);
   const departedSet = new Set(departed.map((d) => d.toLowerCase()));
 
   const evidenceText = evidence
@@ -102,7 +103,7 @@ export async function explainFile(repoUrl: string, file: string, departed: strin
     .join("\n\n");
 
   const user = `Repository: ${repoUrl}
-File: ${file}${content.truncated ? ` (showing first 400 of ${content.totalLines} lines)` : ""}
+File: ${file}${content.truncated ? ` (showing first 260 of ${content.totalLines} lines)` : ""}
 Departed authors: ${departed.length ? departed.join(", ") : "none listed"}
 
 === EVIDENCE (commits and pull requests touching this file, newest first) ===

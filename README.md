@@ -20,9 +20,24 @@ The LLM is only used for the "why does this code exist" brief. Everything else i
 
 Optional: set `GITHUB_TOKEN` so PR lookups get 5000 requests/hour instead of 60.
 
+## Two modes
+
+- **Notice period.** One engineer is leaving. Enter their git email and last day: you get their files ranked by what breaks if nobody picks them up, a suggested receiver per file (the still-here author with the largest share), one-click briefs for the top ten, a KT checklist with coverage percentage, and a countdown.
+- **Layoffs.** Many people left at once. Paste the list or upload a CSV, see the blast radius on the heatmap, and watch knowledge-absorption curves for each departed author.
+
+Both modes share the same engine and the same heatmap.
+
+## Extras
+
+- **Ask the ghost.** A question box on any file that answers only from that file's commits and PRs, cites evidence IDs, and says "not documented" when nothing explains it.
+- **Time machine.** A slider under the heatmap that rescores the repo as of any month in the last 30 months, from commit timelines (blame is not available for the past, so it is labelled commit-based).
+- **Knowledge absorption.** For each departed author, the share of their files someone else has edited in the months since their last commit. Flat and low means the knowledge is rotting.
+- **CODEOWNERS download.** Proposes a still-here owner for every file with score 30 or above. GitHub accepts email addresses in CODEOWNERS.
+- **Share link.** Copies a URL that re-runs the same analysis with the same departed list or leaver, so a judge can open it on their own phone.
+
 ## How it works
 
-1. `POST /api/analyze` clones the repo into `.cache/repos/`, picks the 250 most-changed code files, runs `git blame` on each to get line ownership, counts commits in the last 12 months, and builds a relative-import graph. Result is cached in `.cache/analysis/`.
+1. `POST /api/analyze` clones the repo into `.cache/repos/`, picks the 250 most-changed code files, runs `git blame` on each to get line ownership, reads 3 years of history for per-file commit timelines, and builds a relative-import graph. Progress streams back as NDJSON. Result is cached in `.cache/analysis/`.
 2. The browser computes the **Orphaned Criticality Score** per file from the departed list, so toggling a person updates the heatmap instantly:
 
    `orphanShare = 0.6 × blameShare + 0.4 × commitShare`
@@ -31,7 +46,8 @@ Optional: set `GITHUB_TOKEN` so PR lookups get 5000 requests/hour instead of 60.
    Blame share is the fraction of lines last touched by departed authors. Commit share is their fraction of commits in the last 24 months. Blending the two means one formatting commit cannot flip a file's ownership.
 
 3. `POST /api/explain` pulls the last 25 commits for a file plus any linked GitHub PRs, and asks the LLM for a brief where every claim cites a commit or PR ID. Claims without evidence are marked *inferred*; decisions nothing explains go under *reason not documented*.
-4. Every brief is cached under `.cache/briefs/`, and `/report?repo=…&departed=…` is a printable one-pager that includes any briefs already generated for the top files.
+4. `POST /api/explain-batch` streams briefs for several files in sequence, and `POST /api/ask` answers one question about one file under the same evidence rules.
+5. Every brief is cached under `.cache/briefs/`, and `/report?repo=…&departed=…` is a printable one-pager that includes any briefs already generated for the top files.
 
 ## Before the demo
 
@@ -48,11 +64,12 @@ The app shells out to `git` and writes to `.cache/`, so it needs a real filesyst
 
 ## Demo script
 
-1. Analyse `expressjs/express`. Click **top 3 authors leave**.
-2. Click the reddest tile. Show the three factors and who touched it.
-3. Hit **Why does this code exist?** and point at the evidence links.
-4. Click **mark as still here** on one author and watch the map cool down.
-5. Open the report and print to PDF.
+1. **Notice period mode.** Analyse `expressjs/express`, pick the top author as the leaver, set a last day two weeks out. Show the handover plan, the countdown, and the receiver per file. Hit **Generate briefs for the top 10** and let them stream in.
+2. **Ask the ghost.** Open the reddest file and type a judge's question. Point at the evidence link or the "not documented" tag.
+3. **Layoffs mode.** Click **top 3 authors leave**. The map turns red. Show the absorption curves.
+4. **Live override.** Mark one author as still here and watch the map cool down.
+5. **Time machine.** Drag the slider back a year to show the bus factor was already bad.
+6. **Download CODEOWNERS** and open the report.
 
 ## Honest limits
 

@@ -14,6 +14,8 @@ export type FileStat = {
   /** ISO date, or "" when the last change is older than the 3-year history window */
   lastTouched: string;
   lastAuthor: string;
+  /** commits in the 3-year window, newest first, capped: d = YYYY-MM-DD, a = author email */
+  timeline: { d: string; a: string }[];
 };
 
 export type Analysis = {
@@ -63,3 +65,9 @@ export type Brief = {
 export type BriefResult = { brief: Brief; evidence: Evidence[]; model: string; file: string; generatedAt: string };
 
 export type Progress = { step: string; done?: number; total?: number };
+
+export type Receiver = { email: string; name: string; lines: number; commits: number } | null;
+
+export type HandoverItem = { file: Scored; receiver: Receiver };
+
+export type AskResult = { answer: string; evidence: string[]; status: "documented" | "inferred" | "not_documented" };

@@ -1,9 +1,16 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AskGhost } from "@/components/AskGhost";
+import { DecayChart } from "@/components/DecayChart";
+import { HandoverPanel } from "@/components/HandoverPanel";
 import { Treemap } from "@/components/Treemap";
+import { codeownersText, scoreFilesAt } from "@/lib/insights";
 import { scoreColor, scoreFiles } from "@/lib/score";
 import type { Analysis, Brief, BriefResult, Evidence, Progress, Scored } from "@/lib/types";
+
+type Mode = "layoffs" | "notice";
+const MONTHS_BACK = 30;
 
 const SAMPLE_REPOS = ["https://github.com/expressjs/express", "https://github.com/pallets/flask", "https://github.com/axios/axios"];
 const EMAIL_RE = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
@@ -24,15 +31,73 @@ export default function Home() {
   const [briefLoading, setBriefLoading] = useState(false);
   const [briefError, setBriefError] = useState<string | null>(null);
   const [stillHere, setStillHere] = useState<Set<string>>(new Set());
+  const [mode, setMode] = useState<Mode>("layoffs");
+  const [noticeEmail, setNoticeEmail] = useState("");
+  const [lastDay, setLastDay] = useState("");
+  const [monthsAgo, setMonthsAgo] = useState(0);
+  const [copied, setCopied] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const autoRan = useRef(false);
 
   const departed = useMemo(() => {
-    const set = new Set(parseDeparted(departedText));
+    const set = mode === "notice" ? new Set(parseDeparted(noticeEmail)) : new Set(parseDeparted(departedText));
     for (const s of stillHere) set.delete(s);
     return set;
-  }, [departedText, stillHere]);
+  }, [mode, noticeEmail, departedText, stillHere]);
 
-  const scored: Scored[] = useMemo(() => (analysis ? scoreFiles(analysis.files, departed) : []), [analysis, departed]);
+  const asOf = useMemo(() => (monthsAgo > 0 ? new Date(Date.now() - monthsAgo * 30.44 * 86400000) : null), [monthsAgo]);
+  const scored: Scored[] = useMemo(() => {
+    if (!analysis) return [];
+    return asOf ? scoreFilesAt(analysis.files, departed, asOf) : scoreFiles(analysis.files, departed);
+  }, [analysis, departed, asOf]);
+
+  // Share links: /?repo=…&departed=a,b&mode=notice&email=…&lastDay=…
+  useEffect(() => {
+    if (autoRan.current) return;
+    const p = new URLSearchParams(window.location.search);
+    const repo = p.get("repo");
+    if (!repo) return;
+    autoRan.current = true;
+    // Deferred so the URL-driven state lands after hydration, then the analyse button is clicked.
+    const t = setTimeout(() => {
+      setRepoUrl(repo);
+      if (p.get("departed")) setDepartedText(p.get("departed")!.split(",").join("\n"));
+      if (p.get("mode") === "notice") setMode("notice");
+      if (p.get("email")) setNoticeEmail(p.get("email")!);
+      if (p.get("lastDay")) setLastDay(p.get("lastDay")!);
+      setTimeout(() => document.getElementById("analyse-btn")?.click(), 0);
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
+
+  function shareUrl() {
+    const p = new URLSearchParams({ repo: repoUrl });
+    if (mode === "notice") {
+      p.set("mode", "notice");
+      if (noticeEmail) p.set("email", noticeEmail);
+      if (lastDay) p.set("lastDay", lastDay);
+    } else if (departed.size) p.set("departed", [...departed].join(","));
+    return `${window.location.origin}/?${p.toString()}`;
+  }
+
+  async function copyShare() {
+    await navigator.clipboard.writeText(shareUrl());
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  function downloadCodeowners() {
+    if (!analysis) return;
+    const text = codeownersText(scoreFiles(analysis.files, departed), departed, analysis.authors);
+    const blob = new Blob([text], { type: "text/plain" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "CODEOWNERS";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  const departedForCharts = useMemo(() => [...departed].slice(0, 3), [departed]);
   const selectedFile = scored.find((f) => f.path === selected) ?? null;
   const redCount = scored.filter((f) => f.score >= 60).length;
   const orphanedLines = scored.reduce((s, f) => s + f.departedLines, 0);
@@ -128,14 +193,24 @@ export default function Home() {
             Ghost-Architect <span className="ml-2 text-sm font-normal text-zinc-500">bus-factor radar for codebases that lost their authors</span>
           </h1>
           {analysis && (
-            <a href={reportHref} target="_blank" className="text-sm text-zinc-400 underline hover:text-white">
-              Open bus-factor report
-            </a>
+            <div className="flex items-center gap-3 text-sm">
+              <button onClick={copyShare} className="text-zinc-400 underline hover:text-white">{copied ? "Link copied" : "Copy share link"}</button>
+              <button onClick={downloadCodeowners} disabled={departed.size === 0} title="Proposes a still-here owner for every risky file" className="text-zinc-400 underline hover:text-white disabled:opacity-40 disabled:no-underline">Download CODEOWNERS</button>
+              <a href={reportHref} target="_blank" className="text-zinc-400 underline hover:text-white">Open report</a>
+            </div>
           )}
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-6">
+        <div className="mb-4 inline-flex rounded-lg border border-zinc-800 p-0.5 text-sm">
+          {(["notice", "layoffs"] as Mode[]).map((m) => (
+            <button key={m} onClick={() => { setMode(m); setStillHere(new Set()); setSelected(null); }} className={`rounded-md px-3 py-1 ${mode === m ? "bg-zinc-100 text-black" : "text-zinc-400 hover:text-white"}`}>
+              {m === "notice" ? "Notice period" : "Layoffs"}
+            </button>
+          ))}
+          <span className="self-center pl-3 pr-2 text-xs text-zinc-500">{mode === "notice" ? "one engineer is leaving: plan the handover" : "many left at once: see the blast radius"}</span>
+        </div>
         <section className="grid gap-4 md:grid-cols-[1fr_1fr_auto]">
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-zinc-400">Public GitHub repo</span>
@@ -148,6 +223,31 @@ export default function Home() {
               ))}
             </span>
           </label>
+          {mode === "notice" ? (
+            <div className="grid grid-cols-[1fr_auto] gap-2 text-sm">
+              <label className="flex flex-col gap-1">
+                <span className="text-zinc-400">Who is leaving (git email)</span>
+                <input value={noticeEmail} onChange={(e) => { setNoticeEmail(e.target.value); setStillHere(new Set()); }} list="author-list" className="rounded border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-sm" placeholder="alice@company.com" />
+                {analysis && (
+                  <datalist id="author-list">
+                    {Object.entries(analysis.authors).sort((a, b) => b[1].lines - a[1].lines).slice(0, 40).map(([email, a]) => <option key={email} value={email}>{a.name}</option>)}
+                  </datalist>
+                )}
+                {analysis && !noticeEmail && (
+                  <span className="flex flex-wrap gap-1 pt-1 text-xs text-zinc-500">
+                    try:
+                    {Object.entries(analysis.authors).sort((a, b) => b[1].lines - a[1].lines).slice(0, 3).map(([email, a]) => (
+                      <button key={email} onClick={() => setNoticeEmail(email)} className="rounded bg-zinc-800 px-2 py-0.5 text-zinc-300 hover:bg-zinc-700">{a.name}</button>
+                    ))}
+                  </span>
+                )}
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-zinc-400">Last day</span>
+                <input type="date" value={lastDay} onChange={(e) => setLastDay(e.target.value)} className="rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm" />
+              </label>
+            </div>
+          ) : (
           <label className="flex flex-col gap-1 text-sm">
             <span className="flex items-center justify-between text-zinc-400">
               Departed engineers (emails, any format)
@@ -168,8 +268,9 @@ export default function Home() {
               </span>
             )}
           </label>
+          )}
           <div className="flex items-start gap-2 pt-5">
-            <button onClick={() => analyze(false)} disabled={loading} className="rounded bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-50">
+            <button id="analyse-btn" onClick={() => analyze(false)} disabled={loading} className="rounded bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-50">
               {loading ? "Analysing…" : "Analyse"}
             </button>
             {analysis && (
@@ -212,11 +313,38 @@ export default function Home() {
                   </span>
                 </div>
                 <Treemap files={scored} selected={selected} onSelect={(p) => { setSelected(p); setBrief(null); setBriefError(null); }} />
-                {departed.size === 0 && <p className="mt-2 text-xs text-zinc-500">Add departed emails or click a &ldquo;simulate layoffs&rdquo; button to light up the map.</p>}
+                {departed.size === 0 && <p className="mt-2 text-xs text-zinc-500">{mode === "notice" ? "Enter the leaver's git email to light up their files." : "Add departed emails or click a \u201csimulate layoffs\u201d button to light up the map."}</p>}
+
+                <div className="mt-3 flex items-center gap-3 text-xs text-zinc-400">
+                  <span className="shrink-0">Time machine</span>
+                  <input type="range" min={0} max={MONTHS_BACK} step={1} value={monthsAgo} onChange={(e) => setMonthsAgo(Number(e.target.value))} className="w-full accent-zinc-200" style={{ direction: "rtl" }} />
+                  <span className="w-44 shrink-0 text-right">
+                    {asOf ? (
+                      <>as of <span className="text-zinc-200">{asOf.toLocaleDateString("en-IN", { month: "short", year: "numeric" })}</span> <span className="rounded bg-amber-900/60 px-1 text-[10px] text-amber-200">commit-based</span></>
+                    ) : (
+                      <span className="text-zinc-200">today (blame + commits)</span>
+                    )}
+                  </span>
+                </div>
+
+                {mode === "layoffs" && departedForCharts.length > 0 && (
+                  <div className="mt-4">
+                    <p className="mb-2 text-xs uppercase tracking-wide text-zinc-500">Knowledge absorption since they left</p>
+                    <div className="grid gap-3 md:grid-cols-3">
+                      {departedForCharts.map((email) => <DecayChart key={email} files={analysis.files} email={email} name={analysis.authors[email]?.name ?? email} />)}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <aside className="min-w-0">
-                {!selectedFile && (
+                {!selectedFile && mode === "notice" && noticeEmail && departed.size > 0 && (
+                  <HandoverPanel analysis={analysis} repoUrl={repoUrl} email={[...departed][0]} lastDay={lastDay} extraDeparted={new Set()} onSelect={(p) => setSelected(p)} />
+                )}
+                {!selectedFile && mode === "notice" && (!noticeEmail || departed.size === 0) && (
+                  <div className="rounded-lg border border-zinc-800 p-4 text-sm text-zinc-400">Enter the leaver&rsquo;s git email above to get their handover plan.</div>
+                )}
+                {!selectedFile && mode === "layoffs" && (
                   <div className="rounded-lg border border-zinc-800 p-4 text-sm text-zinc-400">
                     <p className="mb-3 font-medium text-zinc-200">Riskiest files</p>
                     <ol className="space-y-1">
@@ -256,7 +384,7 @@ export default function Home() {
                         .slice(0, 6)
                         .map(([email, n]) => {
                           const gone = departed.has(email);
-                          const listed = parseDeparted(departedText).includes(email);
+                          const listed = mode === "notice" ? parseDeparted(noticeEmail).includes(email) : parseDeparted(departedText).includes(email);
                           const commits = selectedFile.commitAuthors?.[email] ?? 0;
                           return (
                             <li key={email} className="flex items-center gap-2 text-xs">
@@ -281,6 +409,7 @@ export default function Home() {
                     </button>
                     {briefError && <p className="mt-2 text-xs text-red-300">{briefError}</p>}
                     {brief && <BriefView brief={brief.brief} evidence={brief.evidence} model={brief.model} />}
+                    <AskGhost repoUrl={repoUrl} file={selectedFile.path} />
                   </div>
                 )}
               </aside>
