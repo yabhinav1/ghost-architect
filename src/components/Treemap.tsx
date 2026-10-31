@@ -52,6 +52,15 @@ export function Treemap({ files, selected, onSelect }: { files: Scored[]; select
   const tipLeft = hover ? Math.min(hover.x + 14, size.w - 260) : 0;
   const tipTop = hover ? (hover.y > size.h - 150 ? hover.y - 140 : hover.y + 14) : 0;
 
+  if (files.length === 0) {
+    return (
+      <div ref={ref} className="blankslate rounded-md border border-border bg-canvas-inset" style={{ minHeight: 240 }}>
+        <h3>No code files to map</h3>
+        <p>This repository has no files Ghost-Architect recognises as source, or git could not read them.</p>
+      </div>
+    );
+  }
+
   return (
     <div
       ref={ref}
@@ -64,7 +73,7 @@ export function Treemap({ files, selected, onSelect }: { files: Scored[]; select
           {g.data.name}
         </div>
       ))}
-      {layout.leaves.map((d) => {
+      {layout.leaves.filter((d) => d.data.file).map((d) => {
         const file = byPath.get(d.data.file!.path) ?? d.data.file!;
         const w = d.x1 - d.x0;
         const h = d.y1 - d.y0;

@@ -8,7 +8,10 @@ import type { Analysis, FileStat, Progress } from "./types";
 const run = promisify(execFile);
 const CACHE = path.join(process.cwd(), ".cache");
 const MAX_FILES = 250;
-const BLAME_CONCURRENCY = 8;
+/** Parallel git blame processes. Keep this low on small hosts: each blame streams but git itself uses memory. */
+const BLAME_CONCURRENCY = Math.max(1, Number(process.env.BLAME_CONCURRENCY ?? (process.env.RENDER ? 3 : 8)));
+/** Files bigger than this are not blamed line by line (generated bundles, data dumps); they get one owner from git log. */
+const MAX_BLAME_BYTES = 400 * 1024;
 const MAX_BUFFER = 256 * 1024 * 1024;
 /** Refuse to clone anything bigger than this (GitHub reports size in KB). Protects small hosts. */
 export const MAX_REPO_KB = Number(process.env.MAX_REPO_MB ?? 300) * 1024;
@@ -17,7 +20,12 @@ const HISTORY_WINDOW = "3.years";
 const TIMELINE_CAP = 300;
 const MONTH_MS = 30.44 * 24 * 3600 * 1000;
 
-const CODE_EXT = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".py", ".go", ".java", ".rb", ".rs", ".kt", ".cs", ".php"]);
+const CODE_EXT = new Set([
+  ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".vue", ".svelte", ".astro",
+  ".py", ".go", ".java", ".kt", ".kts", ".scala", ".rb", ".rs", ".cs", ".php", ".swift", ".m", ".mm", ".dart", ".ex", ".exs", ".lua", ".r", ".R",
+  ".c", ".h", ".cc", ".cpp", ".cxx", ".hpp", ".hh",
+  ".html", ".htm", ".css", ".scss", ".sass", ".less", ".sql", ".sh", ".bash", ".zsh", ".ps1", ".pl", ".ipynb",
+]);
 const SKIP_DIRS = /(^|\/)(node_modules|vendor|dist|build|out|\.next|coverage|__pycache__|third_party|generated|fixtures|testdata)\//;
 const SKIP_FILES = /(\.min\.js|\.d\.ts|\.lock|package-lock\.json|yarn\.lock|\.snap|\.pb\.go|_pb2\.py)$/;
 
@@ -171,22 +179,45 @@ async function pool<T, R>(items: T[], n: number, fn: (t: T, i: number) => Promis
   return out;
 }
 
-async function blame(dir: string, file: string): Promise<{ lines: number; authors: Record<string, number> }> {
-  const authors: Record<string, number> = {};
+/**
+ * Line ownership via `git blame --line-porcelain`, consumed as a stream so a large file never
+ * sits in memory as one string (line-porcelain output is roughly ten times the file size).
+ */
+function blame(dir: string, file: string): Promise<{ lines: number; authors: Record<string, number> }> {
+  return new Promise((resolve) => {
+    const authors: Record<string, number> = {};
+    let lines = 0;
+    let carry = "";
+    const child = spawn("git", ["blame", "-w", "--line-porcelain", "HEAD", "--", file], { cwd: dir, stdio: ["ignore", "pipe", "ignore"] });
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      const text = carry + chunk;
+      const parts = text.split("\n");
+      carry = parts.pop() ?? "";
+      for (const line of parts) {
+        if (line.startsWith("author-mail ")) {
+          const email = line.slice(12).replace(/^<|>$/g, "").toLowerCase();
+          authors[email] = (authors[email] ?? 0) + 1;
+          lines++;
+        }
+      }
+    });
+    child.on("error", () => resolve({ lines: 0, authors: {} }));
+    child.on("close", () => resolve({ lines, authors }));
+  });
+}
+
+/** Cheap ownership for oversized files: whoever made the most commits to it in the window owns all its lines. */
+async function coarseOwnership(dir: string, file: string, commitAuthors: Record<string, number> | undefined): Promise<{ lines: number; authors: Record<string, number> }> {
   let lines = 0;
   try {
-    const out = await git(dir, ["blame", "-w", "--line-porcelain", "HEAD", "--", file]);
-    for (const line of out.split("\n")) {
-      if (line.startsWith("author-mail ")) {
-        const email = line.slice(12).replace(/^<|>$/g, "").toLowerCase();
-        authors[email] = (authors[email] ?? 0) + 1;
-        lines++;
-      }
-    }
+    const { stdout } = await run("wc", ["-l", path.join(dir, file)]);
+    lines = Number(stdout.trim().split(/\s+/)[0]) || 0;
   } catch {
-    // binary or unreadable file
+    return { lines: 0, authors: {} };
   }
-  return { lines, authors };
+  const top = Object.entries(commitAuthors ?? {}).sort((a, b) => b[1] - a[1])[0];
+  return { lines, authors: top ? { [top[0]]: lines } : {} };
 }
 
 /** Build a map of file -> files it imports, restricted to the analysed set. */
@@ -264,7 +295,14 @@ export async function analyzeRepo(repoUrl: string, force = false, onProgress?: O
   const names = new Map<string, string>();
   const authorCommits = new Map<string, number>();
 
-  const history = await git(dir, ["log", `--since=${HISTORY_WINDOW}`, "--name-only", "--format=%x01%aI%x1f%ae%x1f%an"]);
+  let history: string;
+  try {
+    const { stdout } = await run("git", ["log", `--since=${HISTORY_WINDOW}`, "--name-only", "--format=%x01%aI%x1f%ae%x1f%an"], { cwd: dir, maxBuffer: 64 * 1024 * 1024 });
+    history = stdout;
+  } catch (e) {
+    if (String((e as Error).message).includes("maxBuffer")) throw new Error("This repository's recent history is too large to analyse on this server. Run Ghost-Architect locally for it.");
+    throw e;
+  }
   let cur: { date: string; email: string; ts: number } | null = null;
   for (const line of history.split("\n")) {
     if (line.startsWith("\u0001")) {
@@ -293,7 +331,13 @@ export async function analyzeRepo(repoUrl: string, force = false, onProgress?: O
   onProgress?.({ step: "Running git blame", done: 0, total: selected.length });
   let doneCount = 0;
   const blames = await pool(selected, BLAME_CONCURRENCY, async (f) => {
-    const b = await blame(dir, f);
+    let size = 0;
+    try {
+      size = (await fs.stat(path.join(dir, f))).size;
+    } catch {
+      // deleted in working tree; blame will return nothing
+    }
+    const b = size > MAX_BLAME_BYTES ? await coarseOwnership(dir, f, commitAuthors.get(f)) : await blame(dir, f);
     doneCount++;
     if (doneCount % 10 === 0 || doneCount === selected.length) onProgress?.({ step: "Running git blame", done: doneCount, total: selected.length });
     return b;

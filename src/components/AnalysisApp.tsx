@@ -308,6 +308,12 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
           </div>
         )}
 
+        {analysis && analysis.analysedFiles === 0 && (
+          <div className="mb-4 flex items-start gap-2 rounded-md border border-attention/40 bg-attention-muted px-3 py-2 text-[13px]">
+            <Octicon name="file" className="mt-0.5 h-4 w-4 text-attention" />
+            <span>No source files were found in this repository&rsquo;s default branch, so there is nothing to score. Ghost-Architect reads code, markup and stylesheets; images, PDFs and binaries are skipped.</span>
+          </div>
+        )}
         {analysis && (
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(340px,1fr)]">
             <div className="min-w-0 space-y-4">
