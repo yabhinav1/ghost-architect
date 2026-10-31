@@ -1,8 +1,22 @@
+import { Suspense } from "react";
 import { loadBriefs } from "@/lib/explain";
 import { analyzeRepo } from "@/lib/git";
 import { scoreFiles } from "@/lib/score";
 
-export default async function Report({ searchParams }: { searchParams: Promise<{ repo?: string; departed?: string }> }) {
+type Params = Promise<{ repo?: string; departed?: string }>;
+
+// The report depends on the URL and on git, so it renders at request time inside a Suspense boundary.
+export const instant = false;
+
+export default function Report({ searchParams }: { searchParams: Params }) {
+  return (
+    <Suspense fallback={<main className="p-10 font-sans text-gray-500">Building report…</main>}>
+      <ReportBody searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function ReportBody({ searchParams }: { searchParams: Params }) {
   const { repo, departed = "" } = await searchParams;
   if (!repo) return <main className="p-8 font-sans">Missing ?repo= parameter.</main>;
   const analysis = await analyzeRepo(repo);
