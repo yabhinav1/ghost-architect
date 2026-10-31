@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AskGhost } from "@/components/AskGhost";
+import { Assistant } from "@/components/Assistant";
 import { DecayChart } from "@/components/DecayChart";
 import { HandoverPanel } from "@/components/HandoverPanel";
 import { Treemap } from "@/components/Treemap";
@@ -477,6 +478,21 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
           </div>
         )}
       </main>
+
+      {analysis && (
+        <Assistant
+          repoUrl={analysis.repoUrl}
+          context={{
+            mode,
+            selectedFile: selected,
+            departed: [...departed],
+            stats: { files: analysis.analysedFiles, authors: Object.keys(analysis.authors).length, redCount, orphanPct: totalLines ? Math.round((orphanedLines / totalLines) * 100) : 0 },
+            topFiles: scored.slice(0, 10),
+            knownFiles: analysis.files.map((f) => f.path),
+          }}
+          onOpenFile={(p) => { setSelected(p); setBrief(null); setBriefError(null); }}
+        />
+      )}
 
       <footer className="mx-auto max-w-[1400px] px-4 py-6 text-[12px] text-fg-subtle">
         Blame shows who last edited a line, not who understood it. Scores blend 60% blame with 40% of the last 24 months of commits. Confirm ownership with the team before acting.

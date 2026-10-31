@@ -75,3 +75,49 @@ export function extractJson(text: string): unknown {
     throw new LlmError("LLM response was not valid JSON", 502);
   }
 }
+
+/**
+ * Streaming chat. Yields text deltas as they arrive (OpenAI-compatible SSE).
+ * Used by the in-app assistant so answers appear as they are written.
+ */
+export async function* chatStream(messages: ChatMessage[], opts: { maxTokens?: number; temperature?: number } = {}): AsyncGenerator<string> {
+  const { baseUrl, apiKey, model } = llmConfig();
+  if (!apiKey) throw new LlmError("LLM_API_KEY is not set. Copy .env.example to .env.local and add a free Groq or Gemini key.", 401);
+  let res: Response | null = null;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    res = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, messages, temperature: opts.temperature ?? 0.4, max_tokens: opts.maxTokens ?? 700, stream: true }),
+    });
+    if (res.ok) break;
+    const detail = (await res.text()).slice(0, 500);
+    const wait = retryDelayMs(res.status, detail, res.headers, attempt);
+    if (wait === null || attempt === MAX_ATTEMPTS - 1) throw new LlmError(`LLM request failed (${res.status}): ${detail}`, res.status);
+    await sleep(Math.min(wait, 45000));
+  }
+  if (!res?.body) throw new LlmError("LLM returned no stream", 502);
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop() ?? "";
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t.startsWith("data:")) continue;
+      const data = t.slice(5).trim();
+      if (data === "[DONE]") return;
+      try {
+        const j = JSON.parse(data) as { choices?: { delta?: { content?: string } }[] };
+        const piece = j.choices?.[0]?.delta?.content;
+        if (piece) yield piece;
+      } catch {
+        // partial line, ignore
+      }
+    }
+  }
+}
