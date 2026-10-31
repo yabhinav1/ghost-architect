@@ -24,7 +24,6 @@ async function SetupBody() {
     request_oauth_on_install: true,
     default_permissions: { contents: "read", metadata: "read", pull_requests: "read" },
     default_events: [],
-    hook_attributes: { url: `${origin}/api/webhook`, active: false },
   };
 
   return (
