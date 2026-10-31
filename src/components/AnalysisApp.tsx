@@ -216,7 +216,7 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
               </button>
             ))}
           </div>
-          {user ? <UserMenu user={user} /> : <a href="/api/auth/login" className="btn btn-sm">Sign in</a>}
+          {user ? <UserMenu user={user} /> : <Link href="/" className="btn btn-sm">Sign in</Link>}
         </div>
       </header>
 
