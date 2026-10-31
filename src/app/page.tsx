@@ -1,69 +1,363 @@
-import Image from "next/image";
+"use client";
+
+import { useMemo, useRef, useState } from "react";
+import { Treemap } from "@/components/Treemap";
+import { scoreColor, scoreFiles } from "@/lib/score";
+import type { Analysis, Brief, BriefResult, Evidence, Progress, Scored } from "@/lib/types";
+
+const SAMPLE_REPOS = ["https://github.com/expressjs/express", "https://github.com/pallets/flask", "https://github.com/axios/axios"];
+const EMAIL_RE = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
+
+function parseDeparted(text: string): string[] {
+  return [...new Set((text.match(EMAIL_RE) ?? []).map((e) => e.toLowerCase()))];
+}
 
 export default function Home() {
+  const [repoUrl, setRepoUrl] = useState(SAMPLE_REPOS[0]);
+  const [departedText, setDepartedText] = useState("");
+  const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState<Progress | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [brief, setBrief] = useState<BriefResult | null>(null);
+  const [briefLoading, setBriefLoading] = useState(false);
+  const [briefError, setBriefError] = useState<string | null>(null);
+  const [stillHere, setStillHere] = useState<Set<string>>(new Set());
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  const departed = useMemo(() => {
+    const set = new Set(parseDeparted(departedText));
+    for (const s of stillHere) set.delete(s);
+    return set;
+  }, [departedText, stillHere]);
+
+  const scored: Scored[] = useMemo(() => (analysis ? scoreFiles(analysis.files, departed) : []), [analysis, departed]);
+  const selectedFile = scored.find((f) => f.path === selected) ?? null;
+  const redCount = scored.filter((f) => f.score >= 60).length;
+  const orphanedLines = scored.reduce((s, f) => s + f.departedLines, 0);
+  const totalLines = scored.reduce((s, f) => s + f.lines, 0);
+
+  async function analyze(force = false) {
+    setLoading(true);
+    setError(null);
+    setBrief(null);
+    setSelected(null);
+    setProgress({ step: "Starting" });
+    try {
+      const res = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repoUrl, force }) });
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? `Request failed (${res.status})`);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      let result: Analysis | null = null;
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const msg = JSON.parse(line);
+          if (msg.progress) setProgress(msg.progress);
+          if (msg.error) throw new Error(msg.error);
+          if (msg.result) result = msg.result;
+        }
+      }
+      if (!result) throw new Error("Server closed the stream without a result");
+      setAnalysis(result);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+      setProgress(null);
+    }
+  }
+
+  async function explain(file: string) {
+    setBriefLoading(true);
+    setBriefError(null);
+    setBrief(null);
+    try {
+      const res = await fetch("/api/explain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repoUrl, file, departed: [...departed] }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Explain failed");
+      setBrief(data);
+    } catch (e) {
+      setBriefError((e as Error).message);
+    } finally {
+      setBriefLoading(false);
+    }
+  }
+
+  function pickTopAuthors(n: number) {
+    if (!analysis) return;
+    const top = Object.entries(analysis.authors)
+      .sort((a, b) => b[1].lines - a[1].lines)
+      .slice(0, n)
+      .map(([email]) => email);
+    setDepartedText(top.join("\n"));
+    setStillHere(new Set());
+  }
+
+  async function onCsv(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const text = await f.text();
+    const emails = parseDeparted(text);
+    setDepartedText(emails.join("\n"));
+    setStillHere(new Set());
+    if (fileInput.current) fileInput.current.value = "";
+  }
+
+  const reportHref = analysis ? `/report?repo=${encodeURIComponent(repoUrl)}&departed=${encodeURIComponent([...departed].join(","))}` : "#";
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
+    <div className="min-h-screen bg-zinc-950 text-zinc-100">
+      <header className="border-b border-zinc-800 px-6 py-4">
+        <div className="mx-auto flex max-w-7xl items-baseline justify-between">
+          <h1 className="text-xl font-semibold tracking-tight">
+            Ghost-Architect <span className="ml-2 text-sm font-normal text-zinc-500">bus-factor radar for codebases that lost their authors</span>
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+          {analysis && (
+            <a href={reportHref} target="_blank" className="text-sm text-zinc-400 underline hover:text-white">
+              Open bus-factor report
+            </a>
+          )}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+      </header>
+
+      <main className="mx-auto max-w-7xl px-6 py-6">
+        <section className="grid gap-4 md:grid-cols-[1fr_1fr_auto]">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-zinc-400">Public GitHub repo</span>
+            <input value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} className="rounded border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-sm" placeholder="https://github.com/org/repo" />
+            <span className="flex flex-wrap gap-2 pt-1">
+              {SAMPLE_REPOS.map((r) => (
+                <button key={r} onClick={() => setRepoUrl(r)} className="rounded bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300 hover:bg-zinc-700">
+                  {r.replace("https://github.com/", "")}
+                </button>
+              ))}
+            </span>
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="flex items-center justify-between text-zinc-400">
+              Departed engineers (emails, any format)
+              <button type="button" onClick={() => fileInput.current?.click()} className="rounded bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300 hover:bg-zinc-700">
+                upload CSV
+              </button>
+              <input ref={fileInput} type="file" accept=".csv,.txt,text/csv,text/plain" className="hidden" onChange={onCsv} />
+            </span>
+            <textarea value={departedText} onChange={(e) => { setDepartedText(e.target.value); setStillHere(new Set()); }} rows={3} className="rounded border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-xs" placeholder="alice@company.com&#10;bob@company.com" />
+            {analysis && (
+              <span className="flex flex-wrap gap-2 pt-1 text-xs text-zinc-400">
+                Simulate layoffs:
+                {[1, 3, 5].map((n) => (
+                  <button key={n} onClick={() => pickTopAuthors(n)} className="rounded bg-zinc-800 px-2 py-0.5 text-zinc-300 hover:bg-zinc-700">
+                    top {n} author{n > 1 ? "s" : ""} leave
+                  </button>
+                ))}
+              </span>
+            )}
+          </label>
+          <div className="flex items-start gap-2 pt-5">
+            <button onClick={() => analyze(false)} disabled={loading} className="rounded bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-50">
+              {loading ? "Analysing…" : "Analyse"}
+            </button>
+            {analysis && (
+              <button onClick={() => analyze(true)} disabled={loading} className="rounded border border-zinc-700 px-3 py-2 text-sm text-zinc-300">
+                Re-run
+              </button>
+            )}
+          </div>
+        </section>
+
+        {error && <p className="mt-4 rounded border border-red-900 bg-red-950/50 px-3 py-2 text-sm text-red-300">{error}</p>}
+        {loading && progress && (
+          <div className="mt-4 rounded border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-sm text-zinc-300">
+            <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+            {progress.step}
+            {progress.total ? ` · ${progress.done} / ${progress.total}` : ""}
+            {progress.total ? (
+              <span className="ml-3 inline-block h-1.5 w-40 overflow-hidden rounded bg-zinc-800 align-middle">
+                <span className="block h-full bg-emerald-400 transition-[width] duration-300" style={{ width: `${((progress.done ?? 0) / progress.total) * 100}%` }} />
+              </span>
+            ) : null}
+          </div>
+        )}
+
+        {analysis && (
+          <>
+            <section className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+              <Stat label="Files analysed" value={`${analysis.analysedFiles} / ${analysis.totalFiles}`} />
+              <Stat label="Departed authors" value={String(departed.size)} />
+              <Stat label="Lines last touched by departed" value={totalLines ? `${Math.round((orphanedLines / totalLines) * 100)}%` : "0%"} />
+              <Stat label="High-risk files (score ≥ 60)" value={String(redCount)} accent={redCount > 0} />
+            </section>
+
+            <section className="mt-6 grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+              <div>
+                <div className="mb-2 flex items-center justify-between text-xs text-zinc-500">
+                  <span>Tile size = lines of code. Colour = Orphaned Criticality Score.</span>
+                  <span className="flex items-center gap-1">
+                    safe <i className="inline-block h-3 w-8 rounded" style={{ background: `linear-gradient(90deg, ${scoreColor(5)}, ${scoreColor(50)}, ${scoreColor(100)})` }} /> critical
+                  </span>
+                </div>
+                <Treemap files={scored} selected={selected} onSelect={(p) => { setSelected(p); setBrief(null); setBriefError(null); }} />
+                {departed.size === 0 && <p className="mt-2 text-xs text-zinc-500">Add departed emails or click a &ldquo;simulate layoffs&rdquo; button to light up the map.</p>}
+              </div>
+
+              <aside className="min-w-0">
+                {!selectedFile && (
+                  <div className="rounded-lg border border-zinc-800 p-4 text-sm text-zinc-400">
+                    <p className="mb-3 font-medium text-zinc-200">Riskiest files</p>
+                    <ol className="space-y-1">
+                      {scored.slice(0, 12).map((f) => (
+                        <li key={f.path} className="flex items-center gap-2">
+                          <span className="inline-block h-3 w-3 shrink-0 rounded-sm transition-[background-color] duration-500" style={{ background: scoreColor(f.score) }} />
+                          <button onClick={() => setSelected(f.path)} className="truncate text-left font-mono text-xs hover:text-white">{f.path}</button>
+                          <span className="ml-auto text-xs text-zinc-500">{f.score}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+
+                {selectedFile && (
+                  <div className="rounded-lg border border-zinc-800 p-4 text-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="break-all font-mono text-xs text-zinc-200">{selectedFile.path}</p>
+                      <button onClick={() => setSelected(null)} className="text-xs text-zinc-500 hover:text-white">close</button>
+                    </div>
+                    <div className="mt-3 flex items-baseline gap-2">
+                      <span className="text-3xl font-semibold transition-colors duration-500" style={{ color: scoreColor(Math.max(selectedFile.score, 20)) }}>{selectedFile.score}</span>
+                      <span className="text-xs text-zinc-500">orphaned criticality, 0–100</span>
+                    </div>
+
+                    <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                      <Factor label="Orphan share" value={`${Math.round(selectedFile.orphanShare * 100)}%`} hint={`${Math.round(selectedFile.blameShare * 100)}% of lines · ${Math.round(selectedFile.commitShare * 100)}% of commits`} />
+                      <Factor label="Churn" value={String(selectedFile.commits12m)} hint="commits, 12 months" />
+                      <Factor label="Load-bearing" value={String(selectedFile.inbound)} hint="files import this" />
+                    </dl>
+                    <p className="mt-1 text-[10px] text-zinc-600">Orphan share blends 60% blame lines with 40% of the last 24 months of commits, so one formatting commit cannot flip ownership.</p>
+
+                    <p className="mt-4 mb-1 text-xs uppercase tracking-wide text-zinc-500">Who owns it</p>
+                    <ul className="space-y-1">
+                      {Object.entries(selectedFile.authors)
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, 6)
+                        .map(([email, n]) => {
+                          const gone = departed.has(email);
+                          const listed = parseDeparted(departedText).includes(email);
+                          const commits = selectedFile.commitAuthors?.[email] ?? 0;
+                          return (
+                            <li key={email} className="flex items-center gap-2 text-xs">
+                              <span className={`inline-block h-2 w-2 rounded-full ${gone ? "bg-red-500" : "bg-emerald-500"}`} />
+                              <span className="truncate font-mono text-zinc-300" title={email}>{analysis.authors[email]?.name ?? email}</span>
+                              <span className="whitespace-nowrap text-zinc-500">{Math.round((n / selectedFile.lines) * 100)}% lines · {commits} commits</span>
+                              {listed && (
+                                <button
+                                  onClick={() => setStillHere((s) => { const next = new Set(s); if (next.has(email)) next.delete(email); else next.add(email); return next; })}
+                                  className="ml-auto whitespace-nowrap rounded border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-400 hover:text-white"
+                                >
+                                  {gone ? "mark as still here" : "mark as departed"}
+                                </button>
+                              )}
+                            </li>
+                          );
+                        })}
+                    </ul>
+
+                    <button onClick={() => explain(selectedFile.path)} disabled={briefLoading} className="mt-4 w-full rounded bg-white px-3 py-2 text-sm font-medium text-black disabled:opacity-50">
+                      {briefLoading ? "Reading history…" : "Why does this code exist?"}
+                    </button>
+                    {briefError && <p className="mt-2 text-xs text-red-300">{briefError}</p>}
+                    {brief && <BriefView brief={brief.brief} evidence={brief.evidence} model={brief.model} />}
+                  </div>
+                )}
+              </aside>
+            </section>
+          </>
+        )}
       </main>
+    </div>
+  );
+}
+
+function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div className="rounded-lg border border-zinc-800 p-3">
+      <p className="text-xs text-zinc-500">{label}</p>
+      <p className={`text-2xl font-semibold ${accent ? "text-red-400" : ""}`}>{value}</p>
+    </div>
+  );
+}
+
+function Factor({ label, value, hint }: { label: string; value: string; hint: string }) {
+  return (
+    <div className="rounded bg-zinc-900 p-2">
+      <dt className="text-zinc-500">{label}</dt>
+      <dd className="text-lg font-semibold">{value}</dd>
+      <dd className="text-[10px] text-zinc-500">{hint}</dd>
+    </div>
+  );
+}
+
+function BriefView({ brief, evidence, model }: { brief: Brief; evidence: Evidence[]; model: string }) {
+  const byId = Object.fromEntries(evidence.map((e) => [e.id, e]));
+  const Ev = ({ ids }: { ids: string[] }) => (
+    <span className="ml-1 inline-flex flex-wrap gap-1">
+      {ids.map((id) => byId[id] ? (
+        <a key={id} href={byId[id].url} target="_blank" title={byId[id].title} className="rounded bg-zinc-800 px-1 text-[10px] text-sky-300 hover:bg-zinc-700">{id}</a>
+      ) : (
+        <span key={id} className="rounded bg-zinc-800 px-1 text-[10px] text-zinc-500">{id}</span>
+      ))}
+    </span>
+  );
+  return (
+    <div className="mt-4 space-y-3 border-t border-zinc-800 pt-3 text-xs">
+      <p className="leading-relaxed text-zinc-200">{brief.purpose}</p>
+      {brief.claims.length > 0 && (
+        <div>
+          <p className="mb-1 uppercase tracking-wide text-zinc-500">Why it is the way it is</p>
+          <ul className="space-y-1.5">
+            {brief.claims.map((c, i) => (
+              <li key={i} className="leading-relaxed">
+                <span className={`mr-1 rounded px-1 text-[10px] ${c.status === "documented" ? "bg-emerald-900 text-emerald-200" : "bg-amber-900 text-amber-200"}`}>{c.status}</span>
+                {c.claim}
+                {c.evidence.length > 0 && <Ev ids={c.evidence} />}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {brief.undocumented.length > 0 && (
+        <div>
+          <p className="mb-1 uppercase tracking-wide text-zinc-500">Reason not documented</p>
+          <ul className="list-disc space-y-1 pl-4 text-zinc-300">{brief.undocumented.map((u, i) => <li key={i}>{u}</li>)}</ul>
+        </div>
+      )}
+      {brief.risks.length > 0 && (
+        <div>
+          <p className="mb-1 uppercase tracking-wide text-zinc-500">What could break</p>
+          <ul className="list-disc space-y-1 pl-4 text-zinc-300">{brief.risks.map((u, i) => <li key={i}>{u}</li>)}</ul>
+        </div>
+      )}
+      {brief.safeChangeChecklist.length > 0 && (
+        <div>
+          <p className="mb-1 uppercase tracking-wide text-zinc-500">Before you change it</p>
+          <ul className="list-disc space-y-1 pl-4 text-zinc-300">{brief.safeChangeChecklist.map((u, i) => <li key={i}>{u}</li>)}</ul>
+        </div>
+      )}
+      <p className="text-[10px] text-zinc-600">Evidence: {evidence.length} items · model {model} · saved to the report</p>
     </div>
   );
 }
