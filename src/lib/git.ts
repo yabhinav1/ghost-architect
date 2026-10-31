@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
@@ -65,6 +65,7 @@ function authArgs(token?: string): string[] {
 
 /** For GitHub repos, check existence and size before cloning. Other hosts are cloned blind. */
 async function preflight(url: string, token?: string): Promise<void> {
+  if (process.env.GHOST_SKIP_PREFLIGHT === "1") return;
   const m = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)$/);
   if (!m) return;
   const headers: Record<string, string> = { Accept: "application/vnd.github+json", "User-Agent": "ghost-architect" };
@@ -77,10 +78,7 @@ async function preflight(url: string, token?: string): Promise<void> {
     return; // network hiccup: let git decide
   }
   if (res.status === 404) throw new Error(token ? "Repository not found, or your account cannot see it." : "Repository not found. If it is private, sign in with GitHub first.");
-  if (res.status === 403 || res.status === 429) {
-    // Without a size we cannot clone safely on a small host.
-    throw new Error("GitHub is rate-limiting this server right now, so the repository size cannot be checked. Sign in with GitHub, or try again in a few minutes.");
-  }
+  if (res.status === 403 || res.status === 429) return; // rate limited: the clone watchdog below still enforces the size limit
   if (!res.ok) return;
   const info = (await res.json()) as { size?: number; full_name?: string };
   if (info.size && info.size > MAX_REPO_KB) {
@@ -100,13 +98,58 @@ export async function ensureClone(repoUrl: string, onProgress?: OnProgress, toke
   onProgress?.({ step: "Cloning repository" });
   await fs.mkdir(path.dirname(dir), { recursive: true });
   try {
-    await run("git", [...authArgs(token), "clone", "--quiet", "--no-tags", url + ".git", dir], { maxBuffer: MAX_BUFFER });
+    await cloneWithLimit(url, dir, token, onProgress);
   } catch (e) {
     await fs.rm(dir, { recursive: true, force: true });
+    if (e instanceof SizeLimitError) throw e;
     const msg = (e as { stderr?: string }).stderr ?? (e as Error).message;
     throw new Error(`git clone failed. ${token ? "Check you have access to this repo." : "Is the repo public? Sign in with GitHub for private repos."} ${msg.split("\n").filter(Boolean).slice(-1)[0] ?? ""}`.trim());
   }
   return dir;
+}
+
+class SizeLimitError extends Error {}
+
+async function dirKb(dir: string): Promise<number> {
+  try {
+    const { stdout } = await run("du", ["-sk", dir]);
+    return Number(stdout.split("\t")[0]) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * git clone with a watchdog: the .git directory is measured every two seconds and the clone is
+ * killed if it passes the size limit. Works even when the GitHub API cannot tell us the size.
+ */
+function cloneWithLimit(url: string, dir: string, token: string | undefined, onProgress?: OnProgress): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("git", [...authArgs(token), "clone", "--quiet", "--no-tags", url + ".git", dir], { stdio: ["ignore", "ignore", "pipe"] });
+    let stderr = "";
+    child.stderr?.on("data", (d) => { stderr += String(d); });
+    let killed: string | null = null;
+    const started = Date.now();
+    const timer = setInterval(async () => {
+      const kb = await dirKb(dir);
+      const mb = Math.round(kb / 1024);
+      if (mb > 0) onProgress?.({ step: `Cloning repository (${mb} MB so far)` });
+      if (kb > MAX_REPO_KB) {
+        killed = `Stopped cloning at ${mb} MB: the limit on this server is ${Math.round(MAX_REPO_KB / 1024)} MB. Try a smaller repo, or run Ghost-Architect locally for big ones.`;
+        child.kill("SIGKILL");
+      } else if (Date.now() - started > 10 * 60_000) {
+        killed = "Clone took longer than 10 minutes and was stopped.";
+        child.kill("SIGKILL");
+      }
+    }, 2000);
+    child.on("error", (e) => { clearInterval(timer); reject(e); });
+    child.on("close", (code) => {
+      clearInterval(timer);
+      if (killed) reject(new SizeLimitError(killed));
+      else if (code === 0) resolve();
+      else reject(Object.assign(new Error(`git clone exited with ${code}`), { stderr }));
+    });
+  });
 }
 
 function isCodeFile(p: string): boolean {

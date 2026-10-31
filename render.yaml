@@ -23,3 +23,7 @@ services:
         generateValue: true
       - key: APP_URL
         sync: false
+      # Fine-grained PAT with public read access: GitHub API calls from the server (size checks,
+      # PR evidence) get 5000/hour instead of sharing the host's anonymous 60/hour quota.
+      - key: GITHUB_TOKEN
+        sync: false

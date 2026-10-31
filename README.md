@@ -86,7 +86,8 @@ The app shells out to `git` and writes to `.cache/`, so it needs a real filesyst
 
 ## Safety on a public host
 
-- Repos over 300 MB (configurable with `MAX_REPO_MB`) are refused before cloning, using the GitHub API's size field. If GitHub rate-limits the size check, the clone is refused rather than risked.
+- Repos over 300 MB (configurable with `MAX_REPO_MB`) are refused. The GitHub API's size field catches them before cloning; a watchdog on the clone itself kills anything that grows past the limit, so the guard holds even when the API is rate-limited.
+- On a shared host like Render, set `GITHUB_TOKEN` to a fine-grained personal access token with public read access. Anonymous GitHub API calls share one 60/hour quota per IP, which other tenants exhaust; a token gives the server 5000/hour for size checks and PR evidence.
 - `deploy/keepalive.yml` is a GitHub Actions workflow that pings the live site every 10 minutes so the free Render instance never sleeps before a demo. Copy it to `.github/workflows/` (GitHub requires the `workflow` permission to push that path, so do it from the GitHub web UI or your own terminal), or point a free UptimeRobot monitor at the site instead.
 - `npm run warm -- --remote https://your-site` pre-analyses the sample repos on the live server.
 - `npm test` runs 12 unit tests over scoring, receivers, CODEOWNERS, the time machine, absorption curves, and the portfolio summary.
