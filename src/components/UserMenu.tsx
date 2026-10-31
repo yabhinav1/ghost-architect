@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { SessionUser } from "@/lib/types";
 
-export function UserMenu({ user }: { user: SessionUser }) {
+export function UserMenu({ user, admin = false }: { user: SessionUser; admin?: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -26,6 +26,9 @@ export function UserMenu({ user }: { user: SessionUser }) {
             <p className="text-fg-muted">@{user.login}</p>
           </div>
           <Link href="/dashboard" className="block px-3 py-1.5 hover:bg-canvas-subtle" onClick={() => setOpen(false)}>Your repositories</Link>
+          <Link href="/me" className="block px-3 py-1.5 hover:bg-canvas-subtle" onClick={() => setOpen(false)}>Inbox and handovers</Link>
+          <Link href="/org" className="block px-3 py-1.5 hover:bg-canvas-subtle" onClick={() => setOpen(false)}>Organisations</Link>
+          {admin && <Link href="/admin" className="block px-3 py-1.5 hover:bg-canvas-subtle" onClick={() => setOpen(false)}>Platform admin</Link>}
           <Link href="/analyse" className="block px-3 py-1.5 hover:bg-canvas-subtle" onClick={() => setOpen(false)}>Analyse any public repo</Link>
           <Link href="/settings" className="block px-3 py-1.5 hover:bg-canvas-subtle" onClick={() => setOpen(false)}>Settings</Link>
           <a href={`https://github.com/${user.login}`} target="_blank" className="block px-3 py-1.5 hover:bg-canvas-subtle">GitHub profile</a>

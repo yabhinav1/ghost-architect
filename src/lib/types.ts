@@ -28,6 +28,8 @@ export type Analysis = {
   files: FileStat[];
   /** author email -> { name, lines, commits } across analysed files */
   authors: Record<string, { name: string; lines: number; commits: number }>;
+  /** most recent commits in the window, newest first, capped */
+  commits?: CommitEntry[];
 };
 
 export type Scored = FileStat & {
@@ -108,3 +110,103 @@ export type RepoState = {
 };
 
 export type RecentEntry = { repoUrl: string; at: string };
+
+// ---- organisations, roles, notices, handovers ----
+
+export type OrgRole = "owner" | "manager" | "member";
+export type MemberStatus = "active" | "leaving" | "left";
+
+export type Org = {
+  id: string;
+  slug: string;
+  name: string;
+  createdBy: string;
+  createdAt: string;
+  /** NDA / support-access switch: when true, platform admins may view this organisation's data. */
+  supportAccess: boolean;
+  supportAccessChangedAt?: string;
+  supportAccessChangedBy?: string;
+  githubOrg?: string;
+};
+
+export type Member = {
+  id: string; // `${orgId}:${login}`
+  orgId: string;
+  login: string;
+  name: string;
+  avatar?: string;
+  /** git author email used to match commits to this person */
+  email?: string;
+  role: OrgRole;
+  status: MemberStatus;
+  joinedAt: string;
+  lastDay?: string;
+};
+
+export type Invite = {
+  id: string; // token
+  orgId: string;
+  role: OrgRole;
+  /** optional restriction: only this GitHub login may accept */
+  login?: string;
+  createdBy: string;
+  createdAt: string;
+  acceptedBy?: string;
+  acceptedAt?: string;
+};
+
+export type OrgRepo = {
+  id: string; // `${orgId}:${repoKey}`
+  orgId: string;
+  repoUrl: string;
+  addedBy: string;
+  addedAt: string;
+};
+
+export type NoticeType = "general" | "layoff" | "notice-period" | "kt-request" | "handover" | "warning";
+export type NoticeStatus = "sent" | "read" | "acknowledged";
+
+export type Notice = {
+  id: string;
+  orgId: string;
+  toLogin: string;
+  type: NoticeType;
+  subject: string;
+  body: string;
+  status: NoticeStatus;
+  createdBy: string;
+  createdAt: string;
+  readAt?: string;
+  ackAt?: string;
+  /** optional link to a handover this notice is about */
+  handoverId?: string;
+};
+
+export type HandoverFile = { path: string; done: boolean; notes: string; links: string[]; doneAt?: string };
+
+export type Handover = {
+  id: string;
+  orgId: string;
+  repoUrl: string;
+  leaverLogin: string;
+  leaverEmail?: string;
+  receiverLogin: string;
+  files: HandoverFile[];
+  dueDate?: string;
+  status: "open" | "complete";
+  createdBy: string;
+  createdAt: string;
+  completedAt?: string;
+};
+
+export type AuditEntry = {
+  id: string;
+  orgId: string | null; // null for platform-level admin actions
+  actor: string;
+  action: string;
+  target?: string;
+  at: string;
+  meta?: Record<string, unknown>;
+};
+
+export type CommitEntry = { sha: string; date: string; email: string; name: string; subject: string; files: number };

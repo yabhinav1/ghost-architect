@@ -11,6 +11,7 @@ import { relativeTime } from "@/lib/format";
 import { getAppConfig } from "@/lib/app-config";
 import { listRepos } from "@/lib/github";
 import { recentForUser } from "@/lib/userdata";
+import { isAdmin } from "@/lib/roles";
 import { getSession } from "@/lib/session";
 
 export const metadata = { title: "Your repositories · Ghost-Architect" };
@@ -35,11 +36,14 @@ async function DashboardBody() {
         <div className="mx-auto flex max-w-[1200px] items-center gap-3 px-4 py-2.5">
           <Link href="/dashboard" className="flex items-center gap-2 font-semibold"><Mark size={26} className="text-fg" />Ghost-Architect</Link>
           <nav className="ml-4 hidden items-center gap-1 text-[13px] sm:flex">
-            <Link href="/dashboard" className="rounded-md px-2 py-1 font-semibold">Repositories</Link>
+            <Link href="/dashboard" className="rounded-md px-2 py-1 font-semibold">My repositories</Link>
+            <Link href="/org" className="rounded-md px-2 py-1 text-fg-muted hover:text-fg">Organisations</Link>
+            <Link href="/me" className="rounded-md px-2 py-1 text-fg-muted hover:text-fg">Inbox</Link>
             <Link href="/analyse" className="rounded-md px-2 py-1 text-fg-muted hover:text-fg">Analyse any repo</Link>
+            {isAdmin(session.login) && <Link href="/admin" className="rounded-md px-2 py-1 text-fg-muted hover:text-fg">Admin</Link>}
           </nav>
           <span className="ml-auto" />
-          <UserMenu user={user} />
+          <UserMenu user={user} admin={isAdmin(session.login)} />
         </div>
       </header>
 

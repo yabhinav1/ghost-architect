@@ -6,7 +6,7 @@ import path from "node:path";
 import { HISTORY_YEARS, serverGithubToken } from "./env.ts";
 import { buildImportContext, resolveImports } from "./imports.ts";
 import { storeGet, storeSet } from "./store.ts";
-import type { Analysis, FileStat, Progress } from "./types.ts";
+import type { Analysis, CommitEntry, FileStat, Progress } from "./types.ts";
 
 const run = promisify(execFile);
 const CACHE = path.join(process.cwd(), ".cache");
@@ -21,6 +21,7 @@ export const MAX_REPO_KB = Number(process.env.MAX_REPO_MB ?? 300) * 1024;
 /** History window. Keeps the one-pass git log bounded on very large repos. HISTORY_YEARS env, default 4. */
 const HISTORY_WINDOW = `${HISTORY_YEARS}.years`;
 const TIMELINE_CAP = 300;
+const COMMITS_CAP = 400;
 const MONTH_MS = 30.44 * 24 * 3600 * 1000;
 
 const CODE_EXT = new Set([
@@ -318,19 +319,24 @@ export async function analyzeRepo(repoUrl: string, force = false, onProgress?: O
 
   let history: string;
   try {
-    const { stdout } = await run("git", ["log", `--since=${HISTORY_WINDOW}`, "--name-only", "--format=%x01%aI%x1f%ae%x1f%an"], { cwd: dir, maxBuffer: 64 * 1024 * 1024 });
+    const { stdout } = await run("git", ["log", `--since=${HISTORY_WINDOW}`, "--name-only", "--format=%x01%aI%x1f%ae%x1f%an%x1f%h%x1f%s"], { cwd: dir, maxBuffer: 64 * 1024 * 1024 });
     history = stdout;
   } catch (e) {
     if (String((e as Error).message).includes("maxBuffer")) throw new Error("This repository's recent history is too large to analyse on this server. Run Ghost-Architect locally for it.");
     throw e;
   }
   let cur: { date: string; email: string; ts: number } | null = null;
+  const commits: CommitEntry[] = [];
+  let curCommit: CommitEntry | null = null;
   for (const line of history.split("\n")) {
     if (line.startsWith("\u0001")) {
-      const [date, email, name] = line.slice(1).split("\u001f");
+      const [date, email, name, sha, subject] = line.slice(1).split("\u001f");
       cur = { date, email: email.toLowerCase(), ts: Date.parse(date) };
       if (!names.has(cur.email)) names.set(cur.email, name);
+      curCommit = commits.length < COMMITS_CAP ? { sha: sha ?? "", date, email: cur.email, name, subject: (subject ?? "").slice(0, 200), files: 0 } : null;
+      if (curCommit) commits.push(curCommit);
     } else if (line && cur) {
+      if (curCommit) curCommit.files++;
       if (!lastTouched.has(line)) lastTouched.set(line, cur);
       let tl = timelines.get(line);
       if (!tl) timelines.set(line, (tl = []));
@@ -423,6 +429,7 @@ export async function analyzeRepo(repoUrl: string, force = false, onProgress?: O
     analysedFiles: files.length,
     files,
     authors,
+    commits,
   };
   await fs.mkdir(path.dirname(cachePath), { recursive: true });
   await fs.writeFile(cachePath, JSON.stringify(analysis));

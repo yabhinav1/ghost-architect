@@ -30,6 +30,20 @@ If you already have an OAuth App, set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECR
 
 Routes: `/` landing, `/setup` one-time app creation, `/dashboard` your repos, `/r/owner/name` analysis, `/analyse` any public repo without signing in.
 
+## Three roles
+
+Sign in from the menu at the top right of the landing page as a **User**, an **Organisation**, or an **Admin**. One GitHub account can hold all three; the choice only decides where you land.
+
+| Role | Who | Sees | Does |
+| --- | --- | --- | --- |
+| User | An engineer | Own repos, own inbox, handovers where they are the leaver or the receiver | Analyses repos, records notes and links per file during a handover, ticks files off, acknowledges notices |
+| Organisation (owner, manager) | The company | Members with GitHub login, name and git email; linked repos; the activity log of every commit matched to a member; notices and their read/acknowledge status; handover progress; audit log | Links repos, invites engineers, sets who is leaving and their last day, sends notices and letters from templates, assigns handovers from a leaver to a receiver, grants or revokes support access |
+| Admin | The people running Ghost-Architect (`ADMIN_LOGINS`) | Platform metrics, health, model lanes, every organisation's existence and settings, platform audit | Nothing inside an organisation unless its owner has switched on support access, which is audited |
+
+Routes: `/org` your organisations, `/org/<slug>` overview, `/org/<slug>/activity`, `/org/<slug>/notices`, `/org/<slug>/handovers`, `/org/<slug>/settings`, `/me` inbox and handovers, `/invite/<token>` join, `/letter/<id>` printable notice, `/admin`.
+
+Records (organisations, members, invites, notices, handovers, audit) are JSON documents under `.cache/db/`, mirrored to Upstash when configured.
+
 ## Accounts and access
 
 Ghost-Architect is multi-user. Each GitHub account gets:

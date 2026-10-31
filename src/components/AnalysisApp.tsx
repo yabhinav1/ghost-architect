@@ -68,6 +68,7 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const fileInput = useRef<HTMLInputElement>(null);
   const autoRan = useRef(false);
+  const pendingFile = useRef<string | null>(null);
 
   const departed = useMemo(() => {
     const set = mode === "notice" ? new Set(parseDeparted(noticeEmail)) : new Set(parseDeparted(departedText));
@@ -92,6 +93,7 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
     const repo = p.get("repo") ?? (autoRun ? initialRepo : null);
     if (!repo) return;
     autoRan.current = true;
+    pendingFile.current = p.get("file");
     const t = setTimeout(() => {
       setRepoUrl(repo);
       if (p.get("departed")) setDepartedText(p.get("departed")!.split(",").join("\n"));
@@ -199,6 +201,9 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
       }
       if (!result) throw new Error("Server closed the stream without a result");
       setAnalysis(result);
+      const want = pendingFile.current;
+      if (want && result.files.some((f) => f.path === want)) setSelected(want);
+      pendingFile.current = null;
     } catch (e) {
       setError((e as Error).message);
     } finally {

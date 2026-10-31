@@ -5,6 +5,7 @@ import { Mark } from "@/components/Mascot";
 import { Octicon } from "@/components/ui";
 import { UserMenu } from "@/components/UserMenu";
 import { getAppConfig } from "@/lib/app-config";
+import { isAdmin } from "@/lib/roles";
 import { getSession } from "@/lib/session";
 import { storeEnabled } from "@/lib/store";
 import { countSavedScenarios, getRecent } from "@/lib/userdata";
@@ -29,7 +30,7 @@ async function SettingsBody({ searchParams }: { searchParams: Promise<{ cleared?
             <span className="rounded-md px-2 py-1 font-semibold">Settings</span>
           </nav>
           <span className="ml-auto" />
-          <UserMenu user={user} />
+          <UserMenu user={user} admin={isAdmin(session.login)} />
         </div>
       </header>
 

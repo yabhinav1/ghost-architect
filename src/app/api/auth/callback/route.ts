@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getActiveAppConfig } from "@/lib/app-config";
+import { isAdmin } from "@/lib/roles";
 import { appOrigin, seal, SESSION_COOKIE, sessionCookieOptions, STATE_COOKIE, type Session } from "@/lib/session";
 
 function fail(request: Request, msg: string) {
@@ -38,7 +39,10 @@ export async function GET(request: Request) {
   const u = (await userRes.json()) as { login: string; name: string | null; avatar_url: string };
 
   const session: Session = { token: tokenJson.access_token, login: u.login, name: u.name ?? u.login, avatar: u.avatar_url, expiresAt: tokenJson.expires_in ? Date.now() + tokenJson.expires_in * 1000 - 60_000 : undefined };
-  const res = NextResponse.redirect(`${appOrigin(request)}/dashboard`);
+  const as = request.headers.get("cookie")?.match(/gh_login_as=([^;]+)/)?.[1] ?? "user";
+  const landing = as === "admin" ? (isAdmin(u.login) ? "/admin" : "/?error=" + encodeURIComponent(`@${u.login} is not a platform admin. Add the login to ADMIN_LOGINS, or sign in as a user or organisation.`)) : as === "org" ? "/org" : "/dashboard";
+  const res = NextResponse.redirect(`${appOrigin(request)}${landing}`);
+  res.cookies.set("gh_login_as", "", { ...sessionCookieOptions(0) });
   res.cookies.set(SESSION_COOKIE, seal(session), sessionCookieOptions());
   res.cookies.set(STATE_COOKIE, "", { ...sessionCookieOptions(0) });
   return res;
