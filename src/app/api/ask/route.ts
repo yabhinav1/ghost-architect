@@ -2,6 +2,7 @@ import { z } from "zod";
 import { gatherEvidence } from "@/lib/explain";
 import { fileContent } from "@/lib/git";
 import { chatJson, extractJson, LlmError } from "@/lib/llm";
+import { getSession } from "@/lib/session";
 import type { AskResult } from "@/lib/types";
 
 const AskSchema = z.object({
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
   if (!repoUrl || !file || !question?.trim()) return Response.json({ error: "repoUrl, file and question are required" }, { status: 400 });
   if (file.includes("..") || file.startsWith("/")) return Response.json({ error: "Invalid file path" }, { status: 400 });
   try {
-    const [evidence, content] = await Promise.all([gatherEvidence(repoUrl, file), fileContent(repoUrl, file, 260)]);
+    const [evidence, content] = await Promise.all([gatherEvidence(repoUrl, file, (await getSession())?.token), fileContent(repoUrl, file, 260)]);
     const evidenceText = evidence.map((e) => `[${e.id}] ${e.kind.toUpperCase()} ${e.date.slice(0, 10)} by ${e.author}\n${e.title}\n${e.body}`.trim()).join("\n\n");
     const user = `File: ${file}\nQuestion: ${question.trim()}\n\n=== EVIDENCE ===\n${evidenceText || "(none)"}\n\n=== FILE CONTENT ===\n${content.text}`;
     const { text } = await chatJson([{ role: "system", content: SYSTEM }, { role: "user", content: user }], { maxTokens: 800 });

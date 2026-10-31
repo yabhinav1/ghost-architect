@@ -20,6 +20,12 @@ The LLM is only used for the "why does this code exist" brief. Everything else i
 
 Optional: set `GITHUB_TOKEN` so PR lookups get 5000 requests/hour instead of 60.
 
+## Sign in with GitHub
+
+Create an OAuth App at https://github.com/settings/developers with callback `http://localhost:3000/api/auth/callback`, put the Client ID and Secret in `.env.local`, and the landing page gets a **Continue with GitHub** button. The dashboard then lists every repository you can see, private ones included, with search, filters, and one-click Analyse. Private repos are cloned with your token for that request only; the token lives in an encrypted, httpOnly cookie and is never written to disk.
+
+Routes: `/` landing, `/dashboard` your repos, `/r/owner/name` analysis, `/analyse` any public repo without signing in.
+
 ## Two modes
 
 - **Notice period.** One engineer is leaving. Enter their git email and last day: you get their files ranked by what breaks if nobody picks them up, a suggested receiver per file (the still-here author with the largest share), one-click briefs for the top ten, a KT checklist with coverage percentage, and a countdown.

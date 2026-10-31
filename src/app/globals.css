@@ -103,3 +103,17 @@ body {
 input[type="range"].slider { accent-color: var(--color-accent); height: 4px; }
 input[type="checkbox"].check { accent-color: var(--color-success-emphasis); }
 kbd { font-family: var(--font-mono); font-size: 11px; padding: 1px 5px; border: 1px solid var(--color-border); border-bottom-width: 2px; border-radius: 4px; background: var(--color-canvas-subtle); color: var(--color-fg-muted); }
+
+/* Page transitions and skeletons */
+.page-enter { animation: page-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes page-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.stagger > * { animation: page-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.stagger > *:nth-child(1) { animation-delay: 0ms; } .stagger > *:nth-child(2) { animation-delay: 30ms; } .stagger > *:nth-child(3) { animation-delay: 60ms; }
+.stagger > *:nth-child(4) { animation-delay: 90ms; } .stagger > *:nth-child(5) { animation-delay: 120ms; } .stagger > *:nth-child(6) { animation-delay: 150ms; }
+.stagger > *:nth-child(7) { animation-delay: 180ms; } .stagger > *:nth-child(8) { animation-delay: 210ms; } .stagger > *:nth-child(n+9) { animation-delay: 240ms; }
+.skeleton { background: linear-gradient(90deg, #161b22 25%, #21262d 37%, #161b22 63%); background-size: 400% 100%; animation: shimmer 1.4s ease infinite; border-radius: 6px; }
+@keyframes shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+.mascot-float { animation: mascot-float 3.2s ease-in-out infinite; }
+@keyframes mascot-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+.hero-glow { background: radial-gradient(600px 300px at 50% 0%, rgba(31, 111, 235, 0.18), transparent 70%); }
+@media (prefers-reduced-motion: reduce) { .page-enter, .stagger > *, .mascot-float, .skeleton { animation: none; } }

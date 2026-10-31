@@ -71,3 +71,26 @@ export type Receiver = { email: string; name: string; lines: number; commits: nu
 export type HandoverItem = { file: Scored; receiver: Receiver };
 
 export type AskResult = { answer: string; evidence: string[]; status: "documented" | "inferred" | "not_documented" };
+
+export type SessionUser = { login: string; name: string; avatar: string };
+
+export type Repo = {
+  id: number;
+  name: string;
+  full_name: string;
+  owner: { login: string; avatar_url: string };
+  description: string | null;
+  language: string | null;
+  stargazers_count: number;
+  forks_count: number;
+  open_issues_count: number;
+  pushed_at: string;
+  private: boolean;
+  fork: boolean;
+  archived: boolean;
+  html_url: string;
+  default_branch: string;
+  size: number;
+};
+
+export type RecentAnalysis = { repoUrl: string; slug: string; analyzedAt: string; analysedFiles: number; authors: number };

@@ -1,4 +1,5 @@
 import { analyzeRepo, normalizeRepoUrl } from "@/lib/git";
+import { getSession } from "@/lib/session";
 import type { Progress } from "@/lib/types";
 
 /**
@@ -21,12 +22,13 @@ export async function POST(request: Request) {
 
   const repoUrl = body.repoUrl;
   const force = Boolean(body.force);
+  const token = (await getSession())?.token;
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       const send = (obj: unknown) => controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
       try {
-        const result = await analyzeRepo(repoUrl, force, (p: Progress) => send({ progress: p }));
+        const result = await analyzeRepo(repoUrl, force, (p: Progress) => send({ progress: p }), token);
         send({ result });
       } catch (e) {
         console.error(e);

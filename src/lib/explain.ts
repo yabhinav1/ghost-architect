@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { cacheDir, fileContent, fileHistory, normalizeRepoUrl, repoKey } from "./git";
+import { ghHeaders } from "./github";
 import { chatJson, extractJson } from "./llm";
 import type { Brief, BriefResult, Evidence } from "./types";
 
@@ -48,11 +49,9 @@ function parsePrNumbers(messages: string[]): number[] {
   return [...nums].slice(0, 5);
 }
 
-async function fetchGithubPr(owner: string, repo: string, n: number): Promise<Evidence | null> {
-  const headers: Record<string, string> = { Accept: "application/vnd.github+json", "User-Agent": "ghost-architect" };
-  if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+async function fetchGithubPr(owner: string, repo: string, n: number, token?: string): Promise<Evidence | null> {
   try {
-    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/pulls/${n}`, { headers });
+    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/pulls/${n}`, { headers: ghHeaders(token) });
     if (!res.ok) return null;
     const pr = (await res.json()) as { title: string; body: string | null; user?: { login: string }; merged_at: string | null; created_at: string; html_url: string };
     return {
@@ -69,7 +68,7 @@ async function fetchGithubPr(owner: string, repo: string, n: number): Promise<Ev
   }
 }
 
-export async function gatherEvidence(repoUrl: string, file: string): Promise<Evidence[]> {
+export async function gatherEvidence(repoUrl: string, file: string, token?: string): Promise<Evidence[]> {
   const url = normalizeRepoUrl(repoUrl);
   const commits = await fileHistory(url, file, 20);
   const evidence: Evidence[] = commits.map((c, i) => ({
@@ -85,14 +84,14 @@ export async function gatherEvidence(repoUrl: string, file: string): Promise<Evi
   const gh = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)$/);
   if (gh) {
     const prs = parsePrNumbers(commits.map((c) => `${c.subject}\n${c.body}`));
-    const fetched = await Promise.all(prs.map((n) => fetchGithubPr(gh[1], gh[2], n)));
+    const fetched = await Promise.all(prs.map((n) => fetchGithubPr(gh[1], gh[2], n, token)));
     fetched.filter((p): p is Evidence => p !== null).forEach((p, i) => evidence.push({ ...p, id: `P${i + 1}` }));
   }
   return evidence;
 }
 
-export async function explainFile(repoUrl: string, file: string, departed: string[]): Promise<BriefResult> {
-  const [evidence, content] = await Promise.all([gatherEvidence(repoUrl, file), fileContent(repoUrl, file, 260)]);
+export async function explainFile(repoUrl: string, file: string, departed: string[], token?: string): Promise<BriefResult> {
+  const [evidence, content] = await Promise.all([gatherEvidence(repoUrl, file, token), fileContent(repoUrl, file, 260)]);
   const departedSet = new Set(departed.map((d) => d.toLowerCase()));
 
   const evidenceText = evidence

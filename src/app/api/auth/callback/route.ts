@@ -1,0 +1,40 @@
+import { NextResponse } from "next/server";
+import { seal, SESSION_COOKIE, sessionCookieOptions, STATE_COOKIE, type Session } from "@/lib/session";
+
+function fail(request: Request, msg: string) {
+  const res = NextResponse.redirect(new URL(`/?error=${encodeURIComponent(msg)}`, request.url));
+  res.cookies.set(STATE_COOKIE, "", { ...sessionCookieOptions(0) });
+  return res;
+}
+
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const code = url.searchParams.get("code");
+  const state = url.searchParams.get("state");
+  const cookieState = request.headers.get("cookie")?.match(new RegExp(`${STATE_COOKIE}=([^;]+)`))?.[1];
+  if (!code || !state || !cookieState || state !== cookieState) return fail(request, "Login state mismatch. Try again.");
+
+  const clientId = process.env.GITHUB_CLIENT_ID;
+  const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+  if (!clientId || !clientSecret) return fail(request, "GitHub OAuth app is not configured.");
+
+  const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code, redirect_uri: `${url.origin}/api/auth/callback` }),
+  });
+  const tokenJson = (await tokenRes.json()) as { access_token?: string; error_description?: string };
+  if (!tokenJson.access_token) return fail(request, tokenJson.error_description ?? "GitHub did not return a token.");
+
+  const userRes = await fetch("https://api.github.com/user", {
+    headers: { Authorization: `Bearer ${tokenJson.access_token}`, Accept: "application/vnd.github+json", "User-Agent": "ghost-architect" },
+  });
+  if (!userRes.ok) return fail(request, "Could not read your GitHub profile.");
+  const u = (await userRes.json()) as { login: string; name: string | null; avatar_url: string };
+
+  const session: Session = { token: tokenJson.access_token, login: u.login, name: u.name ?? u.login, avatar: u.avatar_url };
+  const res = NextResponse.redirect(new URL("/dashboard", request.url));
+  res.cookies.set(SESSION_COOKIE, seal(session), sessionCookieOptions());
+  res.cookies.set(STATE_COOKIE, "", { ...sessionCookieOptions(0) });
+  return res;
+}

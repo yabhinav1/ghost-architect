@@ -54,7 +54,14 @@ async function git(dir: string, args: string[]): Promise<string> {
   return stdout;
 }
 
-export async function ensureClone(repoUrl: string, onProgress?: OnProgress): Promise<string> {
+/** Auth header for a one-off clone. The token is never written to .git/config. */
+function authArgs(token?: string): string[] {
+  if (!token) return [];
+  const basic = Buffer.from(`x-access-token:${token}`).toString("base64");
+  return ["-c", `http.extraheader=AUTHORIZATION: basic ${basic}`];
+}
+
+export async function ensureClone(repoUrl: string, onProgress?: OnProgress, token?: string): Promise<string> {
   const url = normalizeRepoUrl(repoUrl);
   const dir = path.join(CACHE, "repos", repoKey(url));
   if (await exists(path.join(dir, ".git"))) {
@@ -64,11 +71,11 @@ export async function ensureClone(repoUrl: string, onProgress?: OnProgress): Pro
   onProgress?.({ step: "Cloning repository" });
   await fs.mkdir(path.dirname(dir), { recursive: true });
   try {
-    await run("git", ["clone", "--quiet", "--no-tags", url + ".git", dir], { maxBuffer: MAX_BUFFER });
+    await run("git", [...authArgs(token), "clone", "--quiet", "--no-tags", url + ".git", dir], { maxBuffer: MAX_BUFFER });
   } catch (e) {
     await fs.rm(dir, { recursive: true, force: true });
     const msg = (e as { stderr?: string }).stderr ?? (e as Error).message;
-    throw new Error(`git clone failed. Is the repo public? ${msg.split("\n").filter(Boolean).slice(-1)[0] ?? ""}`.trim());
+    throw new Error(`git clone failed. ${token ? "Check you have access to this repo." : "Is the repo public? Sign in with GitHub for private repos."} ${msg.split("\n").filter(Boolean).slice(-1)[0] ?? ""}`.trim());
   }
   return dir;
 }
@@ -158,7 +165,7 @@ async function importGraph(dir: string, files: string[]): Promise<Map<string, Se
   return edges;
 }
 
-export async function analyzeRepo(repoUrl: string, force = false, onProgress?: OnProgress): Promise<Analysis> {
+export async function analyzeRepo(repoUrl: string, force = false, onProgress?: OnProgress, token?: string): Promise<Analysis> {
   const url = normalizeRepoUrl(repoUrl);
   const key = repoKey(url);
   const cachePath = path.join(CACHE, "analysis", key + ".json");
@@ -167,7 +174,7 @@ export async function analyzeRepo(repoUrl: string, force = false, onProgress?: O
     return JSON.parse(await fs.readFile(cachePath, "utf8")) as Analysis;
   }
 
-  const dir = await ensureClone(url, onProgress);
+  const dir = await ensureClone(url, onProgress, token);
   onProgress?.({ step: "Listing files" });
   const all = (await git(dir, ["ls-files"])).split("\n").filter(Boolean);
   const code = all.filter(isCodeFile);
