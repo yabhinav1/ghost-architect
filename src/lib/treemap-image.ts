@@ -1,6 +1,6 @@
 import { layoutFiles } from "@/components/Treemap";
-import { scoreColor } from "./score";
-import type { Scored } from "./types";
+import { scoreColor } from "./score.ts";
+import type { Scored } from "./types.ts";
 
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");

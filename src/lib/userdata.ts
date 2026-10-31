@@ -1,8 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { cacheDir, normalizeRepoUrl, repoKey } from "./git";
-import { storeGet, storeSet } from "./store";
-import type { Analysis, RecentAnalysis, RecentEntry, RepoState } from "./types";
+import { cacheDir, normalizeRepoUrl, repoKey } from "./git.ts";
+import { storeGet, storeSet } from "./store.ts";
+import type { Analysis, RecentAnalysis, RecentEntry, RepoState } from "./types.ts";
 
 /**
  * Per-account data: saved scenarios per repo (who left, who is leaving, KT ticks) and a private

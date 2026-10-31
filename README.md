@@ -99,9 +99,18 @@ The app shells out to `git` and writes to `.cache/`, so it needs a real filesyst
 5. **Time machine.** Drag the slider back a year to show the bus factor was already bad.
 6. **Download CODEOWNERS** and open the report.
 
+## Operating it
+
+- **Self-warming.** On server start the app analyses the sample repos in the background (`WARM_REPOS` to change the list, `WARM_BRIEFS=5` to pre-write briefs too, `WARM_ON_BOOT=0` to disable), so a fresh deploy on an ephemeral disk is demo-ready in a few minutes without anyone touching it.
+- **Health check.** `/api/health` (or `npm run doctor -- https://your-site`) validates the OAuth pair against GitHub, checks the server token and its quota, and reports the model and durable store, without revealing any values. Every credential error in the app links to it.
+- **Self-healing config.** If the host's `GITHUB_CLIENT_SECRET` is wrong or contains a personal access token, sign-in falls through to the one-click `/setup` instead of failing, and a misplaced token is still used for API quota.
+- **Throughput.** Briefs run across model lanes: the primary model plus `LLM_MODELS` on the same key, and an optional second provider via `LLM2_*`. Free tiers limit tokens per minute per model, so two lanes roughly double batch speed; single briefs always use the primary model.
+- **History window.** `HISTORY_YEARS` (default 4) bounds the one-pass git log; files untouched for longer still get a last-touched date from a per-file lookup.
+- **Import graph** follows intra-repo imports in JavaScript/TypeScript (relative and tsconfig aliases), Python, Go, Java/Kotlin/Scala, Rust, Ruby, C/C++, PHP and Dart.
+
 ## Safety on a public host
 
-- Per-IP rate limits: 30 model calls and 10 analyses per 10 minutes for anonymous visitors, three times that when signed in. Over the limit returns a clear 429 instead of silently burning the free LLM quota.
+- Rate limits: 30 model calls and 10 analyses per 10 minutes per anonymous address, three times that per signed-in account, plus a server-wide ceiling so spoofed addresses cannot multiply the quota. Over the limit returns a clear 429 instead of silently burning the free LLM quota.
 - Optional durable cache: set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (free tier) and analyses and briefs survive redeploys on hosts with an ephemeral disk. Without them the local `.cache/` is the only store.
 
 - Repos over 300 MB (configurable with `MAX_REPO_MB`) are refused. The GitHub API's size field catches them before cloning; a watchdog on the clone itself kills anything that grows past the limit, so the guard holds even when the API is rate-limited.
@@ -113,6 +122,5 @@ The app shells out to `git` and writes to `.cache/`, so it needs a real filesyst
 ## Honest limits
 
 - `git blame` shows who last edited a line, not who understood it. We blend in 24 months of commit history and show both numbers, and a human can mark anyone as still here.
-- History is read for the last 3 years only, which keeps huge repos tractable. Files untouched for longer show no last-touched date.
-- Import graph covers relative imports in JS/TS and Python only. Other languages get a load-bearing factor of 1.
+- The import graph counts intra-repo imports only; dynamic imports, build-time aliases beyond tsconfig, and framework magic are not followed.
 - Not on the roadmap for the hackathon: Slack and Jira context, full AST dependency maps, auto-generated tests.

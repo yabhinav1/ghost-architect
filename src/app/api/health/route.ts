@@ -1,4 +1,5 @@
-import { getAppConfig } from "@/lib/app-config";
+import { getAppConfig, validateClientPair } from "@/lib/app-config";
+import { looksLikeGithubToken, serverGithubToken } from "@/lib/env";
 import { llmConfig } from "@/lib/llm";
 import { storeEnabled } from "@/lib/store";
 
@@ -13,36 +14,26 @@ export async function GET() {
   const cfg = getAppConfig();
   if (!cfg) out.oauth = { status: "missing", hint: "Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET, or run /setup." };
   else {
-    const looksLikePat = /^(github_pat_|ghp_|gho_)/.test(cfg.clientSecret);
-    try {
-      // 404 = credentials accepted but that token does not exist (expected); 401 = bad client id or secret.
-      const res = await fetch(`https://api.github.com/applications/${cfg.clientId}/token`, {
-        method: "POST",
-        headers: { Authorization: "Basic " + Buffer.from(`${cfg.clientId}:${cfg.clientSecret}`).toString("base64"), Accept: "application/vnd.github+json", "User-Agent": "ghost-architect", "Content-Type": "application/json" },
-        body: JSON.stringify({ access_token: "ghost-architect-health-check" }),
-      });
-      const valid = res.status === 404;
-      out.oauth = {
-        status: valid ? "ok" : "incorrect",
-        clientId: cfg.clientId,
-        kind: cfg.kind,
-        secretLength: cfg.clientSecret.length,
-        hint: valid ? undefined : looksLikePat ? "GITHUB_CLIENT_SECRET contains a personal access token. Put the PAT in GITHUB_TOKEN and the OAuth App's client secret here." : "GitHub rejects this client id + secret pair. Regenerate the secret on the OAuth App page and paste it into GITHUB_CLIENT_SECRET.",
-      };
-      if (!valid) out.ok = false;
-    } catch (e) {
-      out.oauth = { status: "unknown", error: (e as Error).message };
-    }
+    const secretIsToken = looksLikeGithubToken(cfg.clientSecret);
+    const v = secretIsToken ? "rejected" : await validateClientPair(cfg.clientId, cfg.clientSecret);
+    out.oauth = {
+      status: v === "ok" ? "ok" : v === "rejected" ? "incorrect" : "unknown",
+      clientId: cfg.clientId,
+      kind: cfg.kind,
+      secretLength: cfg.clientSecret.length,
+      hint: v === "ok" ? undefined : secretIsToken ? "GITHUB_CLIENT_SECRET contains a personal access token. Put the PAT in GITHUB_TOKEN and the OAuth App's client secret here." : v === "rejected" ? "GitHub rejects this client id + secret pair. Regenerate the secret on the OAuth App page and paste it into GITHUB_CLIENT_SECRET." : "GitHub could not be reached to validate the pair.",
+    };
+    if (v === "rejected") out.ok = false;
   }
 
-  const token = process.env.GITHUB_TOKEN;
+  const token = serverGithubToken();
   if (!token) out.githubToken = { status: "missing", hint: "Set GITHUB_TOKEN to a fine-grained PAT with public read access so the server has its own API quota." };
   else {
     try {
       const res = await fetch("https://api.github.com/rate_limit", { headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "User-Agent": "ghost-architect" } });
       if (res.ok) {
         const j = (await res.json()) as { resources?: { core?: { limit: number; remaining: number } } };
-        out.githubToken = { status: "ok", limitPerHour: j.resources?.core?.limit, remaining: j.resources?.core?.remaining };
+        out.githubToken = { status: "ok", limitPerHour: j.resources?.core?.limit, remaining: j.resources?.core?.remaining, source: process.env.GITHUB_TOKEN ? "GITHUB_TOKEN" : "GITHUB_CLIENT_SECRET (misplaced PAT, used for API quota only)" };
       } else {
         out.githubToken = { status: "invalid", httpStatus: res.status };
         out.ok = false;

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { getAppConfig } from "@/lib/app-config";
+import { getActiveAppConfig } from "@/lib/app-config";
 import { appOrigin, randomState, sessionCookieOptions, STATE_COOKIE } from "@/lib/session";
 
 export async function GET(request: Request) {
-  const cfg = getAppConfig();
-  // First run on a fresh machine: create the GitHub App with one click, then come back here.
-  if (!cfg) return NextResponse.redirect(`${appOrigin(request)}/setup`);
+  const { config: cfg, problem } = await getActiveAppConfig();
+  // No usable credentials (fresh machine, or the host's secret is wrong): create a GitHub App with one click, then come back here.
+  if (!cfg) return NextResponse.redirect(`${appOrigin(request)}/setup${problem ? `?reason=${problem}` : ""}`);
   const origin = appOrigin(request);
   const state = randomState();
   const params = new URLSearchParams({

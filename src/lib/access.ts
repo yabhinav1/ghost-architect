@@ -1,10 +1,10 @@
 import fs from "node:fs/promises";
-import { cacheDir, normalizeRepoUrl, repoKey } from "./git";
-import { ghHeaders } from "./github";
-import { getSession, type Session } from "./session";
-import type { Analysis } from "./types";
+import { cacheDir, normalizeRepoUrl, repoKey } from "./git.ts";
+import { ghHeaders } from "./github.ts";
+import { getSession, type Session } from "./session.ts";
+import type { Analysis } from "./types.ts";
 
-import { decideAccess, probeWithGit, type Visibility } from "./access-rules";
+import { decideAccess, probeWithGit, type Visibility } from "./access-rules.ts";
 export { decideAccess, probeWithGit, type Visibility };
 
 export type AccessDecision = { ok: true; session: Session | null; visibility: Visibility } | { ok: false; status: number; message: string };

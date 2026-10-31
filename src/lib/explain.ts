@@ -2,11 +2,11 @@ import { z } from "zod";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { cacheDir, fileContent, fileHistory, normalizeRepoUrl, repoKey } from "./git";
-import { ghHeaders } from "./github";
-import { storeGet, storeSet } from "./store";
-import { chatJson, extractJson } from "./llm";
-import type { Brief, BriefResult, Evidence } from "./types";
+import { cacheDir, fileContent, fileHistory, normalizeRepoUrl, repoKey } from "./git.ts";
+import { ghHeaders } from "./github.ts";
+import { storeGet, storeSet } from "./store.ts";
+import { chatJson, extractJson } from "./llm.ts";
+import type { Brief, BriefResult, Evidence } from "./types.ts";
 
 // Free-tier models sometimes drift from the exact enum ("undocumented", "Documented", "cited").
 // Anything that is not clearly documented is treated as inferred, and a claim with no evidence can never be documented.

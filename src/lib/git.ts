@@ -3,8 +3,10 @@ import { promisify } from "node:util";
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { storeGet, storeSet } from "./store";
-import type { Analysis, FileStat, Progress } from "./types";
+import { HISTORY_YEARS, serverGithubToken } from "./env.ts";
+import { buildImportContext, resolveImports } from "./imports.ts";
+import { storeGet, storeSet } from "./store.ts";
+import type { Analysis, FileStat, Progress } from "./types.ts";
 
 const run = promisify(execFile);
 const CACHE = path.join(process.cwd(), ".cache");
@@ -16,8 +18,8 @@ const MAX_BLAME_BYTES = 400 * 1024;
 const MAX_BUFFER = 256 * 1024 * 1024;
 /** Refuse to clone anything bigger than this (GitHub reports size in KB). Protects small hosts. */
 export const MAX_REPO_KB = Number(process.env.MAX_REPO_MB ?? 300) * 1024;
-/** History window. Keeps the one-pass git log bounded on very large repos. */
-const HISTORY_WINDOW = "3.years";
+/** History window. Keeps the one-pass git log bounded on very large repos. HISTORY_YEARS env, default 4. */
+const HISTORY_WINDOW = `${HISTORY_YEARS}.years`;
 const TIMELINE_CAP = 300;
 const MONTH_MS = 30.44 * 24 * 3600 * 1000;
 
@@ -37,10 +39,27 @@ export function normalizeRepoUrl(input: string): string {
   if (!/^https?:\/\//i.test(url)) throw new Error("Repo URL must start with https://");
   url = url.replace(/\/+$/, "").replace(/\.git$/, "");
   const u = new URL(url);
-  u.hostname = u.hostname.toLowerCase();
+  u.hostname = u.hostname.toLowerCase().replace(/^www\./, "");
   u.search = "";
   u.hash = "";
-  return u.toString();
+  u.username = "";
+  u.password = "";
+  if (u.hostname === "github.com") {
+    // GitHub owner and repo names are case-insensitive; one canonical form means one cache entry and one access check.
+    const parts = u.pathname.split("/").filter(Boolean);
+    if (parts.length < 2) throw new Error("GitHub URL must look like https://github.com/owner/repo");
+    u.pathname = "/" + parts.slice(0, 2).join("/").toLowerCase();
+  }
+  return u.toString().replace(/\/+$/, "");
+}
+
+/** A path inside the repo working tree: relative, no traversal, no absolute or drive-letter forms. */
+export function assertRepoPath(file: string): string {
+  const f = file.replace(/\\/g, "/");
+  if (!f || f.startsWith("/") || /^[A-Za-z]:/.test(f) || f.includes("\0") || f.split("/").some((seg) => seg === "..")) {
+    throw new Error("Invalid file path");
+  }
+  return path.posix.normalize(f).replace(/^\.\//, "");
 }
 
 export function repoKey(repoUrl: string): string {
@@ -78,7 +97,7 @@ async function preflight(url: string, token?: string): Promise<boolean | undefin
   const m = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)$/);
   if (!m) return undefined;
   const headers: Record<string, string> = { Accept: "application/vnd.github+json", "User-Agent": "ghost-architect" };
-  const t = token || process.env.GITHUB_TOKEN;
+  const t = token || serverGithubToken();
   if (t) headers.Authorization = `Bearer ${t}`;
   let res: Response;
   try {
@@ -102,7 +121,7 @@ async function visibilityOf(url: string, token?: string): Promise<boolean | unde
   if (!m) return undefined;
   try {
     const headers: Record<string, string> = { Accept: "application/vnd.github+json", "User-Agent": "ghost-architect" };
-    const t = token || process.env.GITHUB_TOKEN;
+    const t = token || serverGithubToken();
     if (t) headers.Authorization = `Bearer ${t}`;
     const res = await fetch(`https://api.github.com/repos/${m[1]}/${m[2]}`, { headers });
     if (!res.ok) return undefined;
@@ -240,50 +259,22 @@ async function coarseOwnership(dir: string, file: string, commitAuthors: Record<
   return { lines, authors: top ? { [top[0]]: lines } : {} };
 }
 
-/** Build a map of file -> files it imports, restricted to the analysed set. */
+/** Build a map of file -> files it imports, restricted to the analysed set. Resolution rules live in imports.ts. */
 async function importGraph(dir: string, files: string[]): Promise<Map<string, Set<string>>> {
-  const set = new Set(files);
-  const lookup = (candidates: string[]) => candidates.find((c) => set.has(c));
-  const jsExts = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"];
-  const edges = new Map<string, Set<string>>();
-
-  await pool(files, 16, async (file) => {
-    let src = "";
+  const readFile = async (p: string): Promise<string | null> => {
     try {
-      src = await fs.readFile(path.join(dir, file), "utf8");
+      return await fs.readFile(path.join(dir, p), "utf8");
     } catch {
-      return;
+      return null;
     }
-    const targets = new Set<string>();
-    const fromDir = path.posix.dirname(file);
-    const ext = path.extname(file);
-
-    if (jsExts.includes(ext)) {
-      const re = /(?:from\s+|require\(\s*|import\(\s*)['"](\.{1,2}\/[^'"]+)['"]/g;
-      for (const m of src.matchAll(re)) {
-        const base = path.posix.normalize(path.posix.join(fromDir, m[1]));
-        const hit = lookup([base, ...jsExts.map((e) => base + e), ...jsExts.map((e) => base + "/index" + e)]);
-        if (hit && hit !== file) targets.add(hit);
-      }
-    } else if (ext === ".py") {
-      const re = /^\s*(?:from\s+([\w.]+)\s+import|import\s+([\w.]+))/gm;
-      for (const m of src.matchAll(re)) {
-        const mod = m[1] ?? m[2];
-        let base: string;
-        if (mod.startsWith(".")) {
-          const ups = mod.match(/^\.+/)![0].length - 1;
-          const rest = mod.slice(ups + 1).replace(/\./g, "/");
-          let d = fromDir;
-          for (let i = 0; i < ups; i++) d = path.posix.dirname(d);
-          base = path.posix.normalize(path.posix.join(d, rest));
-        } else {
-          base = mod.replace(/\./g, "/");
-        }
-        const hit = lookup([base + ".py", base + "/__init__.py", "src/" + base + ".py", "src/" + base + "/__init__.py"]);
-        if (hit && hit !== file) targets.add(hit);
-      }
-    }
-    if (targets.size) edges.set(file, targets);
+  };
+  const ctx = await buildImportContext(files, readFile);
+  const edges = new Map<string, Set<string>>();
+  await pool(files, 16, async (file) => {
+    const src = await readFile(file);
+    if (src === null) return;
+    const targets = resolveImports(file, src, ctx);
+    if (targets.length) edges.set(file, new Set(targets));
   });
   return edges;
 }
@@ -313,7 +304,7 @@ export async function analyzeRepo(repoUrl: string, force = false, onProgress?: O
   const code = all.filter(isCodeFile);
 
   // One bounded pass over history: per-file commit counts, per-author commit counts, last-touched.
-  onProgress?.({ step: `Reading ${HISTORY_WINDOW.replace(".", " ")} of history` });
+  onProgress?.({ step: `Reading ${HISTORY_YEARS} years of history` });
   const now = Date.now();
   const cut12 = now - 12 * MONTH_MS;
   const cut24 = now - 24 * MONTH_MS;
@@ -373,6 +364,21 @@ export async function analyzeRepo(repoUrl: string, force = false, onProgress?: O
     return b;
   });
 
+  // Files untouched inside the window still deserve a last-touched date: one cheap git log each, bounded.
+  const stale = selected.filter((p) => !lastTouched.has(p)).slice(0, 150);
+  if (stale.length) {
+    onProgress?.({ step: `Dating ${stale.length} files older than ${HISTORY_YEARS} years` });
+    await pool(stale, 8, async (p) => {
+      try {
+        const out = await git(dir, ["log", "-1", "--format=%aI%x1f%ae", "--", p]);
+        const [date, email] = out.trim().split("\u001f");
+        if (date) lastTouched.set(p, { date, email: (email ?? "").toLowerCase() });
+      } catch {
+        // leave undated
+      }
+    });
+  }
+
   onProgress?.({ step: "Building import graph" });
   const edges = await importGraph(dir, selected);
   const inbound = new Map<string, number>();
@@ -427,8 +433,9 @@ export async function analyzeRepo(repoUrl: string, force = false, onProgress?: O
 
 /** Recent commits for one file, used as evidence for the explainer. */
 export async function fileHistory(repoUrl: string, file: string, limit = 25) {
+  const safe = assertRepoPath(file);
   const dir = await ensureClone(repoUrl);
-  const out = await git(dir, ["log", `-n${limit}`, "--format=%H%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%b%x1e", "--", file]);
+  const out = await git(dir, ["log", `-n${limit}`, "--format=%H%x1f%an%x1f%ae%x1f%aI%x1f%s%x1f%b%x1e", "--", safe]);
   return out
     .split("\u001e")
     .map((rec) => rec.trim())
@@ -440,8 +447,11 @@ export async function fileHistory(repoUrl: string, file: string, limit = 25) {
 }
 
 export async function fileContent(repoUrl: string, file: string, maxLines = 600): Promise<{ text: string; truncated: boolean; totalLines: number }> {
+  const safe = assertRepoPath(file);
   const dir = await ensureClone(repoUrl);
-  const text = await fs.readFile(path.join(dir, file), "utf8");
+  const full = path.resolve(dir, safe);
+  if (!full.startsWith(path.resolve(dir) + path.sep)) throw new Error("Invalid file path");
+  const text = await fs.readFile(full, "utf8");
   const lines = text.split("\n");
   return { text: lines.slice(0, maxLines).join("\n"), truncated: lines.length > maxLines, totalLines: lines.length };
 }

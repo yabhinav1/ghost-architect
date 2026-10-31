@@ -1,4 +1,4 @@
-import { fileContent, fileHistory, normalizeRepoUrl } from "@/lib/git";
+import { assertRepoPath, fileContent, fileHistory, normalizeRepoUrl } from "@/lib/git";
 import { chatStream, LlmError, type ChatMessage } from "@/lib/llm";
 import { authorizeRepo, denied } from "@/lib/access";
 import { rateLimit, tooMany } from "@/lib/ratelimit";
@@ -49,14 +49,23 @@ export async function POST(request: Request) {
   }
   const access = await authorizeRepo(url);
   if (!access.ok) return denied(access);
-  const rl = rateLimit(request, "llm", Boolean(access.session));
+  const rl = rateLimit(request, "llm", access.session?.login ?? null);
   if (!rl.ok) return tooMany(rl, "assistant questions");
 
   // Which files to open: the selected one, plus any known path the user mentions in their last message.
   const last = messages[messages.length - 1]?.content ?? "";
   const known = new Set(context.knownFiles ?? []);
   const mentioned = [...known].filter((p) => last.includes(p) || last.includes(p.split("/").pop() ?? "\u0000")).slice(0, 2);
-  const wanted = [...new Set([context.selectedFile, ...mentioned].filter((p): p is string => Boolean(p)))].slice(0, 2);
+  const wanted = [...new Set([context.selectedFile, ...mentioned].filter((p): p is string => Boolean(p)))]
+    .filter((p) => {
+      try {
+        assertRepoPath(p);
+        return true;
+      } catch {
+        return false; // traversal or absolute paths are silently dropped; the model is told nothing was loaded
+      }
+    })
+    .slice(0, 2);
 
   const fileBlocks: string[] = [];
   for (const f of wanted) {

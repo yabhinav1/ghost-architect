@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   if (body.file.includes("..") || body.file.startsWith("/")) return Response.json({ error: "Invalid file path" }, { status: 400 });
   const access = await authorizeRepo(body.repoUrl);
   if (!access.ok) return denied(access);
-  const rl = rateLimit(request, "llm", Boolean(access.session));
+  const rl = rateLimit(request, "llm", access.session?.login ?? null);
   if (!rl.ok) return tooMany(rl, "briefs");
   try {
     const result = await explainFile(body.repoUrl, body.file, body.departed ?? [], access.session?.token);

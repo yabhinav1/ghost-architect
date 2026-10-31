@@ -1,4 +1,4 @@
-import type { FileStat, Scored } from "./types";
+import type { FileStat, Scored } from "./types.ts";
 
 export const BLAME_WEIGHT = 0.6;
 export const COMMIT_WEIGHT = 0.4;

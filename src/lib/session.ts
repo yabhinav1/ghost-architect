@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
-import type { SessionUser } from "./types";
+import type { SessionUser } from "./types.ts";
 
 export type Session = SessionUser & { token: string; expiresAt?: number };
 

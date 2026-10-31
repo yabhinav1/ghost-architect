@@ -1,15 +1,16 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { cacheDir } from "./git";
-import type { Analysis, RecentAnalysis, Repo } from "./types";
+import { serverGithubToken } from "./env.ts";
+import { cacheDir } from "./git.ts";
+import type { Analysis, RecentAnalysis, Repo } from "./types.ts";
 
 const TTL_MS = 120_000;
 const listingCache = new Map<string, { at: number; listing: RepoListing }>();
 
 export function ghHeaders(token?: string): Record<string, string> {
   const h: Record<string, string> = { Accept: "application/vnd.github+json", "User-Agent": "ghost-architect", "X-GitHub-Api-Version": "2022-11-28" };
-  const t = token || process.env.GITHUB_TOKEN;
+  const t = token || serverGithubToken();
   if (t) h.Authorization = `Bearer ${t}`;
   return h;
 }
@@ -80,4 +81,4 @@ export async function recentAnalyses(limit = 8): Promise<RecentAnalysis[]> {
   return out.sort((a, b) => b.analyzedAt.localeCompare(a.analyzedAt)).slice(0, limit);
 }
 
-export { LANGUAGE_COLORS, relativeTime } from "./format";
+export { LANGUAGE_COLORS, relativeTime } from "./format.ts";

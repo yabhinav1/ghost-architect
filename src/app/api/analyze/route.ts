@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   const access = await authorizeRepo(repoUrl);
   if (!access.ok) return denied(access);
   const session = access.session;
-  const rl = rateLimit(request, "analyze", Boolean(session));
+  const rl = rateLimit(request, "analyze", session?.login ?? null);
   if (!rl.ok) return tooMany(rl, "analyses");
   const token = session?.token;
   const login = session?.login;

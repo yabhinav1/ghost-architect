@@ -1,5 +1,5 @@
 import { scoreFiles } from "./score.ts";
-import type { Analysis, FileStat, HandoverItem, Receiver, Scored } from "./types";
+import type { Analysis, FileStat, HandoverItem, Receiver, Scored } from "./types.ts";
 
 const MONTH_MS = 30.44 * 24 * 3600 * 1000;
 

@@ -314,7 +314,7 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
                 <span className="mx-1 text-fg-muted">/</span>
                 <a href={analysis.repoUrl} target="_blank" className="text-accent hover:underline">{repoSlug(analysis.repoUrl).split("/")[1]}</a>
               </h1>
-              <span className={`label ${analysis.private ? "label-attention" : "label-muted"}`}>{analysis.private ? "Private" : analysis.private === false ? "Public" : "Git"}</span>
+              <span className={`label ${analysis.private ? "label-attention" : "label-muted"}`} title={analysis.private === undefined ? "Visibility could not be confirmed with GitHub" : undefined}>{analysis.private ? "Private" : analysis.private === false ? "Public" : analysis.repoUrl.includes("github.com") ? "GitHub" : "Git"}</span>
               <span className="ml-auto flex items-center gap-2">
                 <button onClick={copyShare} className="btn btn-sm"><Octicon name="share" className="h-3.5 w-3.5" />{copied ? "Copied" : "Share"}</button>
                 <button onClick={downloadCodeowners} disabled={departed.size === 0} className="btn btn-sm" title="Proposes a still-here owner for every risky file"><Octicon name="download" className="h-3.5 w-3.5" />CODEOWNERS</button>

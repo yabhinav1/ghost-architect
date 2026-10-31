@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   if (file.includes("..") || file.startsWith("/")) return Response.json({ error: "Invalid file path" }, { status: 400 });
   const access = await authorizeRepo(repoUrl);
   if (!access.ok) return denied(access);
-  const rl = rateLimit(request, "llm", Boolean(access.session));
+  const rl = rateLimit(request, "llm", access.session?.login ?? null);
   if (!rl.ok) return tooMany(rl, "questions");
   try {
     const [evidence, content] = await Promise.all([gatherEvidence(repoUrl, file, access.session?.token), fileContent(repoUrl, file, 260)]);

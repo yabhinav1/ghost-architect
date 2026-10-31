@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAppConfig } from "@/lib/app-config";
+import { getActiveAppConfig } from "@/lib/app-config";
 import { appOrigin, seal, SESSION_COOKIE, sessionCookieOptions, STATE_COOKIE, type Session } from "@/lib/session";
 
 function fail(request: Request, msg: string) {
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   const cookieState = request.headers.get("cookie")?.match(new RegExp(`${STATE_COOKIE}=([^;]+)`))?.[1];
   if (!code || !state || !cookieState || state !== cookieState) return fail(request, "Login state mismatch. Try again.");
 
-  const cfg = getAppConfig();
+  const { config: cfg } = await getActiveAppConfig();
   if (!cfg) return fail(request, "GitHub app is not configured.");
   const { clientId, clientSecret } = cfg;
 
@@ -25,7 +25,11 @@ export async function GET(request: Request) {
     body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code, redirect_uri: `${appOrigin(request)}/api/auth/callback` }),
   });
   const tokenJson = (await tokenRes.json()) as { access_token?: string; expires_in?: number; error_description?: string };
-  if (!tokenJson.access_token) return fail(request, tokenJson.error_description ?? "GitHub did not return a token.");
+  if (!tokenJson.access_token) {
+    const why = tokenJson.error_description ?? "GitHub did not return a token.";
+    const hint = /client_id|client_secret/i.test(why) ? " The server's GitHub app credentials are wrong: open /api/health to see which variable to fix." : "";
+    return fail(request, why + hint);
+  }
 
   const userRes = await fetch("https://api.github.com/user", {
     headers: { Authorization: `Bearer ${tokenJson.access_token}`, Accept: "application/vnd.github+json", "User-Agent": "ghost-architect" },

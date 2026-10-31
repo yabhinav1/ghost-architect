@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "warm": "node --experimental-strip-types --no-warnings scripts/warm.ts",
-    "test": "node --experimental-strip-types --no-warnings --test \"tests/**/*.test.ts\""
+    "test": "node --experimental-strip-types --no-warnings --test \"tests/**/*.test.ts\"",
+    "doctor": "node --experimental-strip-types --no-warnings scripts/doctor.ts"
   },
   "dependencies": {
     "d3-hierarchy": "^3.1.2",

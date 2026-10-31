@@ -1,5 +1,5 @@
 import { explainFile } from "@/lib/explain";
-import { LlmError } from "@/lib/llm";
+import { laneCount, LlmError } from "@/lib/llm";
 import { authorizeRepo, denied } from "@/lib/access";
 import { rateLimit, tooMany } from "@/lib/ratelimit";
 
@@ -19,20 +19,27 @@ export async function POST(request: Request) {
   if (!access.ok) return denied(access);
   const session = access.session;
   const token = session?.token;
-  const rl = rateLimit(request, "llm", Boolean(session), Math.min(files.length, 15));
+  const rl = rateLimit(request, "llm", session?.login ?? null, Math.min(files.length, 15));
   if (!rl.ok) return tooMany(rl, "briefs");
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       const send = (obj: unknown) => controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
-      for (const file of files.slice(0, 15)) {
-        try {
-          send({ file, result: await explainFile(repoUrl, file, departed, token) });
-        } catch (e) {
-          send({ file, error: e instanceof LlmError ? e.message : (e as Error).message });
-          if (e instanceof LlmError && e.status === 401) break;
+      // One request in flight per model lane: free tiers limit tokens per minute per model.
+      const queue = files.slice(0, 15);
+      let stop = false;
+      const worker = async () => {
+        while (queue.length && !stop) {
+          const file = queue.shift()!;
+          try {
+            send({ file, result: await explainFile(repoUrl, file, departed, token) });
+          } catch (e) {
+            send({ file, error: e instanceof LlmError ? e.message : (e as Error).message });
+            if (e instanceof LlmError && e.status === 401) stop = true;
+          }
         }
-      }
+      };
+      await Promise.all(Array.from({ length: Math.min(laneCount(), 3, queue.length) }, worker));
       controller.close();
     },
   });
