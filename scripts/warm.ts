@@ -6,6 +6,9 @@
  */
 import type { Progress } from "../src/lib/types.ts";
 
+// Keep this file an ES module after type-stripping so top-level await works.
+export {};
+
 const DEFAULTS = ["https://github.com/expressjs/express", "https://github.com/pallets/flask", "https://github.com/axios/axios"];
 const args = process.argv.slice(2);
 const remoteIdx = args.indexOf("--remote");
