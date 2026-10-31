@@ -4,8 +4,8 @@ import { ghHeaders } from "./github";
 import { getSession, type Session } from "./session";
 import type { Analysis } from "./types";
 
-import { decideAccess, type Visibility } from "./access-rules";
-export { decideAccess, type Visibility };
+import { decideAccess, probeWithGit, type Visibility } from "./access-rules";
+export { decideAccess, probeWithGit, type Visibility };
 
 export type AccessDecision = { ok: true; session: Session | null; visibility: Visibility } | { ok: false; status: number; message: string };
 
@@ -55,7 +55,18 @@ export async function authorizeRepo(repoUrl: string): Promise<AccessDecision> {
     vis = await lookup(m[1], m[2], session?.token);
     if (vis !== "unknown") visCache.set(key, { at: Date.now(), vis });
   }
-  const cachedPrivate = vis === "unknown" ? await cachedPrivateFlag(url) : undefined;
+  let cachedPrivate = vis === "unknown" ? await cachedPrivateFlag(url) : undefined;
+  if (vis === "unknown" && cachedPrivate === undefined) {
+    // Rate-limited and nothing cached: ask git instead of the API.
+    const probed = await probeWithGit(url);
+    if (probed === "public") {
+      vis = "public";
+      visCache.set(key, { at: Date.now(), vis });
+    } else if (!session) {
+      vis = "missing"; // anonymous and not readable anonymously: private or gone
+      cachedPrivate = undefined;
+    }
+  }
   const d = decideAccess(vis, Boolean(session), cachedPrivate);
   if (!d.ok) return { ok: false, status: d.status!, message: d.message! };
   return { ok: true, session, visibility: vis };
