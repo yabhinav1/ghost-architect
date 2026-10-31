@@ -1,6 +1,7 @@
+import { authorizeRepo, denied } from "@/lib/access";
 import { analyzeRepo, normalizeRepoUrl } from "@/lib/git";
-import { getSession } from "@/lib/session";
 import { rateLimit, tooMany } from "@/lib/ratelimit";
+import { addRecent } from "@/lib/userdata";
 import type { Progress } from "@/lib/types";
 
 /**
@@ -8,9 +9,6 @@ import type { Progress } from "@/lib/types";
  * then one {"result": Analysis} or {"error": string} line.
  */
 export async function POST(request: Request) {
-  const signedIn = Boolean(await getSession());
-  const rl = rateLimit(request, "analyze", signedIn);
-  if (!rl.ok) return tooMany(rl, "analyses");
   let body: { repoUrl?: string; force?: boolean };
   try {
     body = await request.json();
@@ -26,13 +24,21 @@ export async function POST(request: Request) {
 
   const repoUrl = body.repoUrl;
   const force = Boolean(body.force);
-  const token = (await getSession())?.token;
+  const access = await authorizeRepo(repoUrl);
+  if (!access.ok) return denied(access);
+  const session = access.session;
+  const rl = rateLimit(request, "analyze", Boolean(session));
+  if (!rl.ok) return tooMany(rl, "analyses");
+  const token = session?.token;
+  const login = session?.login;
+
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       const send = (obj: unknown) => controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
       try {
         const result = await analyzeRepo(repoUrl, force, (p: Progress) => send({ progress: p }), token);
+        if (login) await addRecent(login, repoUrl).catch(() => undefined);
         send({ result });
       } catch (e) {
         console.error(e);

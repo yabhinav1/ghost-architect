@@ -9,7 +9,8 @@ import { UserMenu } from "@/components/UserMenu";
 import Loading from "./loading";
 import { relativeTime } from "@/lib/format";
 import { getAppConfig } from "@/lib/app-config";
-import { listRepos, recentAnalyses } from "@/lib/github";
+import { listRepos } from "@/lib/github";
+import { recentForUser } from "@/lib/userdata";
 import { getSession } from "@/lib/session";
 
 export const metadata = { title: "Your repositories · Ghost-Architect" };
@@ -17,7 +18,7 @@ export const metadata = { title: "Your repositories · Ghost-Architect" };
 async function DashboardBody() {
   const session = await getSession();
   if (!session) redirect("/");
-  const [listing, recent] = await Promise.all([listRepos(session.token), recentAnalyses()]);
+  const [listing, recent] = await Promise.all([listRepos(session.token), recentForUser(session.login)]);
   const repos = listing.repos;
   const cfg = getAppConfig();
   const installUrl = cfg?.kind === "github-app" && cfg.slug ? `https://github.com/apps/${cfg.slug}/installations/new` : null;
@@ -73,14 +74,14 @@ async function DashboardBody() {
           <div className="card">
             <div className="card-header"><Octicon name="history" className="h-4 w-4 text-fg-muted" />Recently analysed</div>
             {recent.length === 0 ? (
-              <p className="px-4 py-4 text-[12px] text-fg-muted">Nothing yet. Pick a repository and hit Analyse.</p>
+              <p className="px-4 py-4 text-[12px] text-fg-muted">Nothing yet. Pick a repository and hit Analyse. Your history is private to your account.</p>
             ) : (
               <ul className="divide-y divide-border-muted">
                 {recent.map((r) => (
                   <li key={r.repoUrl}>
                     <Link href={`/r/${r.slug}`} className="block px-4 py-2 hover:bg-canvas-subtle">
                       <p className="truncate font-mono text-[12px] text-accent">{r.slug}</p>
-                      <p className="text-[11px] text-fg-muted">{r.analysedFiles} files · {r.authors} authors · {relativeTime(r.analyzedAt)}</p>
+                      <p className="text-[11px] text-fg-muted">{r.analysedFiles ? `${r.analysedFiles} files · ${r.authors} authors · ` : ""}{relativeTime(r.analyzedAt)}</p>
                     </Link>
                   </li>
                 ))}

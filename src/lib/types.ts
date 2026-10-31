@@ -21,6 +21,8 @@ export type FileStat = {
 export type Analysis = {
   repoUrl: string;
   analyzedAt: string;
+  /** true for a private GitHub repo, false for public, undefined when GitHub could not be asked or the host is not GitHub */
+  private?: boolean;
   totalFiles: number;
   analysedFiles: number;
   files: FileStat[];
@@ -94,3 +96,15 @@ export type Repo = {
 };
 
 export type RecentAnalysis = { repoUrl: string; slug: string; analyzedAt: string; analysedFiles: number; authors: number };
+
+export type RepoState = {
+  mode: "layoffs" | "notice";
+  departed: string[];
+  stillHere: string[];
+  noticeEmail: string;
+  lastDay: string;
+  kt: string[];
+  updatedAt: string;
+};
+
+export type RecentEntry = { repoUrl: string; at: string };

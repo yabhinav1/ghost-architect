@@ -72,11 +72,11 @@ function authArgs(token?: string): string[] {
   return ["-c", `http.extraheader=AUTHORIZATION: basic ${basic}`];
 }
 
-/** For GitHub repos, check existence and size before cloning. Other hosts are cloned blind. */
-async function preflight(url: string, token?: string): Promise<void> {
-  if (process.env.GHOST_SKIP_PREFLIGHT === "1") return;
+/** For GitHub repos, check existence and size before cloning. Other hosts are cloned blind. Returns the private flag when known. */
+async function preflight(url: string, token?: string): Promise<boolean | undefined> {
+  if (process.env.GHOST_SKIP_PREFLIGHT === "1") return undefined;
   const m = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)$/);
-  if (!m) return;
+  if (!m) return undefined;
   const headers: Record<string, string> = { Accept: "application/vnd.github+json", "User-Agent": "ghost-architect" };
   const t = token || process.env.GITHUB_TOKEN;
   if (t) headers.Authorization = `Bearer ${t}`;
@@ -84,16 +84,35 @@ async function preflight(url: string, token?: string): Promise<void> {
   try {
     res = await fetch(`https://api.github.com/repos/${m[1]}/${m[2]}`, { headers });
   } catch {
-    return; // network hiccup: let git decide
+    return undefined; // network hiccup: let git decide
   }
   if (res.status === 404) throw new Error(token ? "Repository not found, or your account cannot see it." : "Repository not found. If it is private, sign in with GitHub first.");
-  if (res.status === 403 || res.status === 429) return; // rate limited: the clone watchdog below still enforces the size limit
-  if (!res.ok) return;
-  const info = (await res.json()) as { size?: number; full_name?: string };
+  if (res.status === 403 || res.status === 429) return undefined; // rate limited: the clone watchdog below still enforces the size limit
+  if (!res.ok) return undefined;
+  const info = (await res.json()) as { size?: number; full_name?: string; private?: boolean };
   if (info.size && info.size > MAX_REPO_KB) {
     throw new Error(`${info.full_name ?? "This repository"} is ${Math.round(info.size / 1024)} MB. The limit on this server is ${Math.round(MAX_REPO_KB / 1024)} MB. Try a smaller repo, or run Ghost-Architect locally for big ones.`);
   }
+  return info.private;
 }
+
+/** Visibility for an already-cloned repo, so cached analyses carry the flag too. */
+async function visibilityOf(url: string, token?: string): Promise<boolean | undefined> {
+  const m = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)$/);
+  if (!m) return undefined;
+  try {
+    const headers: Record<string, string> = { Accept: "application/vnd.github+json", "User-Agent": "ghost-architect" };
+    const t = token || process.env.GITHUB_TOKEN;
+    if (t) headers.Authorization = `Bearer ${t}`;
+    const res = await fetch(`https://api.github.com/repos/${m[1]}/${m[2]}`, { headers });
+    if (!res.ok) return undefined;
+    return ((await res.json()) as { private?: boolean }).private;
+  } catch {
+    return undefined;
+  }
+}
+
+const knownPrivate = new Map<string, boolean | undefined>();
 
 export async function ensureClone(repoUrl: string, onProgress?: OnProgress, token?: string): Promise<string> {
   const url = normalizeRepoUrl(repoUrl);
@@ -103,7 +122,7 @@ export async function ensureClone(repoUrl: string, onProgress?: OnProgress, toke
     return dir;
   }
   onProgress?.({ step: "Checking repository" });
-  await preflight(url, token);
+  knownPrivate.set(url, await preflight(url, token));
   onProgress?.({ step: "Cloning repository" });
   await fs.mkdir(path.dirname(dir), { recursive: true });
   try {
@@ -389,9 +408,11 @@ export async function analyzeRepo(repoUrl: string, force = false, onProgress?: O
     }
   });
 
+  const isPrivate = knownPrivate.has(url) ? knownPrivate.get(url) : await visibilityOf(url, token);
   const analysis: Analysis = {
     repoUrl: url,
     analyzedAt: new Date().toISOString(),
+    private: isPrivate,
     totalFiles: code.length,
     analysedFiles: files.length,
     files,

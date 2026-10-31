@@ -16,7 +16,7 @@ import { UserMenu } from "@/components/UserMenu";
 import { codeownersText, scoreFilesAt } from "@/lib/insights";
 import { downloadTreemapPng } from "@/lib/treemap-image";
 import { scoreColor, scoreFiles } from "@/lib/score";
-import type { Analysis, Brief, BriefResult, Evidence, Progress, Scored, SessionUser } from "@/lib/types";
+import type { Analysis, Brief, BriefResult, Evidence, Progress, RepoState, Scored, SessionUser } from "@/lib/types";
 
 type Mode = "layoffs" | "notice";
 const MONTHS_BACK = 30;
@@ -62,6 +62,10 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
   const [copied, setCopied] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [kt, setKt] = useState<Set<string>>(new Set());
+  const [saveState, setSaveState] = useState<"idle" | "loading" | "saving" | "saved" | "error">("idle");
+  const stateLoadedFor = useRef<string | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const fileInput = useRef<HTMLInputElement>(null);
   const autoRan = useRef(false);
 
@@ -98,6 +102,46 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
     }, 0);
     return () => clearTimeout(t);
   }, [autoRun, initialRepo]);
+
+  // Signed-in users get their scenario for this repo back: who left, who is leaving, KT ticks.
+  useEffect(() => {
+    if (!analysis || !user) return;
+    const repo = analysis.repoUrl;
+    if (stateLoadedFor.current === repo) return;
+    let cancelled = false;
+    setSaveState("loading");
+    fetch(`/api/me/state?repo=${encodeURIComponent(repo)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { state: RepoState | null } | null) => {
+        if (cancelled) return;
+        const st = d?.state;
+        if (st) {
+          setMode(st.mode);
+          setDepartedText(st.departed.join("\n"));
+          setStillHere(new Set(st.stillHere));
+          setNoticeEmail(st.noticeEmail);
+          setLastDay(st.lastDay);
+          setKt(new Set(st.kt));
+        }
+        stateLoadedFor.current = repo;
+        setSaveState(st ? "saved" : "idle");
+      })
+      .catch(() => { if (!cancelled) setSaveState("error"); });
+    return () => { cancelled = true; };
+  }, [analysis, user]);
+
+  useEffect(() => {
+    if (!analysis || !user || stateLoadedFor.current !== analysis.repoUrl) return;
+    clearTimeout(saveTimer.current);
+    setSaveState("saving");
+    const body = { repo: analysis.repoUrl, state: { mode, departed: parseDeparted(departedText), stillHere: [...stillHere], noticeEmail, lastDay, kt: [...kt] } };
+    saveTimer.current = setTimeout(() => {
+      fetch("/api/me/state", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+        .then((r) => setSaveState(r.ok ? "saved" : "error"))
+        .catch(() => setSaveState("error"));
+    }, 800);
+    return () => clearTimeout(saveTimer.current);
+  }, [analysis, user, mode, departedText, stillHere, noticeEmail, lastDay, kt]);
 
   useEffect(() => {
     if (!analysis) return;
@@ -270,11 +314,14 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
                 <span className="mx-1 text-fg-muted">/</span>
                 <a href={analysis.repoUrl} target="_blank" className="text-accent hover:underline">{repoSlug(analysis.repoUrl).split("/")[1]}</a>
               </h1>
-              <span className="label label-muted">{analysis.repoUrl.includes("github.com") ? "GitHub" : "Git"}</span>
+              <span className={`label ${analysis.private ? "label-attention" : "label-muted"}`}>{analysis.private ? "Private" : analysis.private === false ? "Public" : "Git"}</span>
               <span className="ml-auto flex items-center gap-2">
                 <button onClick={copyShare} className="btn btn-sm"><Octicon name="share" className="h-3.5 w-3.5" />{copied ? "Copied" : "Share"}</button>
                 <button onClick={downloadCodeowners} disabled={departed.size === 0} className="btn btn-sm" title="Proposes a still-here owner for every risky file"><Octicon name="download" className="h-3.5 w-3.5" />CODEOWNERS</button>
                 <a href={reportHref} target="_blank" className="btn btn-sm"><Octicon name="report" className="h-3.5 w-3.5" />Report</a>
+                <span className="text-[11px] text-fg-subtle" title={user ? "Your departed list, leaver and KT ticks are saved to your account" : "Sign in to keep your scenario across devices"}>
+                  {user ? (saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved to your account" : saveState === "error" ? "Not saved" : saveState === "loading" ? "Loading your scenario…" : "") : "Sign in to save"}
+                </span>
                 <button onClick={() => setTourOpen(true)} className="btn btn-sm btn-invisible" title="Guided tour">Tour</button>
                 <button onClick={() => analyze(true)} disabled={loading} className="btn btn-sm btn-invisible" title="Re-clone and re-analyse"><Octicon name="history" className="h-3.5 w-3.5" /></button>
               </span>
@@ -308,7 +355,8 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
         {error && (
           <div className="mb-4 flex items-start gap-2 rounded-md border border-danger/40 bg-danger-muted px-3 py-2 text-[13px] text-fg">
             <Octicon name="flame" className="mt-0.5 h-4 w-4 text-danger" />
-            <span>{error}</span>
+            <span className="flex-1">{error}</span>
+            {!user && /sign in/i.test(error) && <a href="/api/auth/login" className="btn btn-sm btn-primary">Sign in with GitHub</a>}
           </div>
         )}
         {loading && progress && (
@@ -446,7 +494,7 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
             {/* Side panel */}
             <aside className="min-w-0" data-tour="panel">
               {!selectedFile && mode === "notice" && departed.size > 0 && (
-                <HandoverPanel analysis={analysis} repoUrl={repoUrl} email={[...departed][0]} lastDay={lastDay} extraDeparted={new Set()} onSelect={(p) => setSelected(p)} />
+                <HandoverPanel analysis={analysis} repoUrl={repoUrl} email={[...departed][0]} lastDay={lastDay} extraDeparted={new Set()} onSelect={(p) => setSelected(p)} done={kt} onToggleDone={(p) => setKt((s) => { const n = new Set(s); if (n.has(p)) n.delete(p); else n.add(p); return n; })} />
               )}
               {!selectedFile && mode === "notice" && departed.size === 0 && (
                 <Card title="Handover plan">

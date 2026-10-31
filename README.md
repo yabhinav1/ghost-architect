@@ -30,6 +30,15 @@ If you already have an OAuth App, set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECR
 
 Routes: `/` landing, `/setup` one-time app creation, `/dashboard` your repos, `/r/owner/name` analysis, `/analyse` any public repo without signing in.
 
+## Accounts and access
+
+Ghost-Architect is multi-user. Each GitHub account gets:
+
+- **Private history.** "Recently analysed" on the dashboard is yours alone.
+- **Saved scenarios per repo.** The departed list, who is leaving and their last day, "still here" overrides, and KT checklist ticks are saved to your account the moment you change them, and come back on any device. The repo header shows "Saved to your account".
+- **Access checks everywhere.** A private repository's analysis, briefs, assistant answers, PR checks, reports and share links are only served to accounts whose GitHub token can read it. Anonymous visitors can analyse public repositories only. Shared analysis caches of public repos are reused across users; scenarios never are.
+- **Settings** at `/settings`: account, what is stored, and a one-click "clear my data".
+
 ## Two modes
 
 - **Notice period.** One engineer is leaving. Enter their git email and last day: you get their files ranked by what breaks if nobody picks them up, a suggested receiver per file (the still-here author with the largest share), one-click briefs for the top ten, a KT checklist with coverage percentage, and a countdown.

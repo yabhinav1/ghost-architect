@@ -13,11 +13,19 @@ type Props = {
   lastDay: string;
   extraDeparted: Set<string>;
   onSelect: (path: string) => void;
+  /** Controlled KT ticks (saved per account). Omit for local-only state. */
+  done?: Set<string>;
+  onToggleDone?: (path: string) => void;
 };
 
-export function HandoverPanel({ analysis, repoUrl, email, lastDay, extraDeparted, onSelect }: Props) {
+export function HandoverPanel({ analysis, repoUrl, email, lastDay, extraDeparted, onSelect, done: doneProp, onToggleDone }: Props) {
   const plan = useMemo(() => handoverPlan(analysis, email, extraDeparted), [analysis, email, extraDeparted]);
-  const [done, setDone] = useState<Set<string>>(new Set());
+  const [doneLocal, setDoneLocal] = useState<Set<string>>(new Set());
+  const done = doneProp ?? doneLocal;
+  const toggleDone = (path: string) => {
+    if (onToggleDone) onToggleDone(path);
+    else setDoneLocal((s) => { const n = new Set(s); if (n.has(path)) n.delete(path); else n.add(path); return n; });
+  };
   const [briefs, setBriefs] = useState<Record<string, BriefResult | { error: string }>>({});
   const [running, setRunning] = useState<string | null>(null);
 
@@ -171,7 +179,7 @@ export function HandoverPanel({ analysis, repoUrl, email, lastDay, extraDeparted
           return (
             <li key={file.path} className={`px-3 py-2 ${ticked ? "bg-success-muted" : "hover:bg-canvas-subtle"}`}>
               <div className="flex items-start gap-2">
-                <input type="checkbox" className="check mt-1" checked={ticked} onChange={() => setDone((s) => { const n = new Set(s); if (n.has(file.path)) n.delete(file.path); else n.add(file.path); return n; })} />
+                <input type="checkbox" className="check mt-1" checked={ticked} onChange={() => toggleDone(file.path)} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="inline-block h-3 w-3 shrink-0 rounded-sm" style={{ background: scoreColor(file.score) }} />

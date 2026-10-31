@@ -27,6 +27,7 @@ export function UserMenu({ user }: { user: SessionUser }) {
           </div>
           <Link href="/dashboard" className="block px-3 py-1.5 hover:bg-canvas-subtle" onClick={() => setOpen(false)}>Your repositories</Link>
           <Link href="/analyse" className="block px-3 py-1.5 hover:bg-canvas-subtle" onClick={() => setOpen(false)}>Analyse any public repo</Link>
+          <Link href="/settings" className="block px-3 py-1.5 hover:bg-canvas-subtle" onClick={() => setOpen(false)}>Settings</Link>
           <a href={`https://github.com/${user.login}`} target="_blank" className="block px-3 py-1.5 hover:bg-canvas-subtle">GitHub profile</a>
           <div className="my-1 border-t border-border" />
           <a href="/api/auth/logout" className="block px-3 py-1.5 text-danger hover:bg-canvas-subtle">Sign out</a>

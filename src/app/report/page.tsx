@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { authorizeRepo } from "@/lib/access";
 import { loadBriefs } from "@/lib/explain";
 import { analyzeRepo } from "@/lib/git";
 import { scoreFiles } from "@/lib/score";
@@ -19,7 +20,17 @@ export default function Report({ searchParams }: { searchParams: Params }) {
 async function ReportBody({ searchParams }: { searchParams: Params }) {
   const { repo, departed = "" } = await searchParams;
   if (!repo) return <main className="p-8 font-sans">Missing ?repo= parameter.</main>;
-  const analysis = await analyzeRepo(repo);
+  const access = await authorizeRepo(repo);
+  if (!access.ok) {
+    return (
+      <main className="mx-auto max-w-xl p-10 font-sans text-[#1f2328]" style={{ colorScheme: "light" }}>
+        <h1 className="text-xl font-semibold">Report unavailable</h1>
+        <p className="mt-2 text-sm text-[#59636e]">{access.message}</p>
+        {access.status === 401 && <a href="/api/auth/login" className="mt-4 inline-block rounded-md border border-[#d1d9e0] px-3 py-1.5 text-sm">Sign in with GitHub</a>}
+      </main>
+    );
+  }
+  const analysis = await analyzeRepo(repo, false, undefined, access.session?.token);
   const departedSet = new Set(departed.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean));
   const scored = scoreFiles(analysis.files, departedSet);
   const top = scored.filter((f) => f.score > 0).slice(0, 15);

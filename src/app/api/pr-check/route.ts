@@ -1,6 +1,6 @@
 import { normalizeRepoUrl } from "@/lib/git";
 import { ghHeaders } from "@/lib/github";
-import { getSession } from "@/lib/session";
+import { authorizeRepo, denied } from "@/lib/access";
 
 export type PrFile = { path: string; status: string; additions: number; deletions: number };
 export type PrInfo = { number: number; title: string; author: string; state: string; url: string; files: PrFile[]; truncated: boolean };
@@ -26,7 +26,9 @@ export async function POST(request: Request) {
   const n = Number(String(pr).match(/\/pull\/(\d+)/)?.[1] ?? String(pr).replace(/^#/, ""));
   if (!Number.isInteger(n) || n <= 0) return Response.json({ error: "Enter a PR number like 42 or paste the PR link" }, { status: 400 });
 
-  const token = (await getSession())?.token;
+  const access = await authorizeRepo(url);
+  if (!access.ok) return denied(access);
+  const token = access.session?.token;
   const headers = ghHeaders(token);
   const meta = await fetch(`https://api.github.com/repos/${gh[1]}/${gh[2]}/pulls/${n}`, { headers });
   if (meta.status === 404) return Response.json({ error: `PR #${n} was not found${token ? "" : ". Sign in if the repo is private"}.` }, { status: 404 });

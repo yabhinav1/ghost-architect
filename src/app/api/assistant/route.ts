@@ -1,6 +1,6 @@
 import { fileContent, fileHistory, normalizeRepoUrl } from "@/lib/git";
 import { chatStream, LlmError, type ChatMessage } from "@/lib/llm";
-import { getSession } from "@/lib/session";
+import { authorizeRepo, denied } from "@/lib/access";
 import { rateLimit, tooMany } from "@/lib/ratelimit";
 
 type Ctx = {
@@ -33,9 +33,6 @@ Rules:
 - When relevant, point to the exact button or panel to click next.`;
 
 export async function POST(request: Request) {
-  const signedIn = Boolean(await getSession());
-  const rl = rateLimit(request, "llm", signedIn);
-  if (!rl.ok) return tooMany(rl, "assistant questions");
   let body: { repoUrl?: string; messages?: ChatMessage[]; context?: Ctx };
   try {
     body = await request.json();
@@ -50,6 +47,10 @@ export async function POST(request: Request) {
   } catch (e) {
     return Response.json({ error: (e as Error).message }, { status: 400 });
   }
+  const access = await authorizeRepo(url);
+  if (!access.ok) return denied(access);
+  const rl = rateLimit(request, "llm", Boolean(access.session));
+  if (!rl.ok) return tooMany(rl, "assistant questions");
 
   // Which files to open: the selected one, plus any known path the user mentions in their last message.
   const last = messages[messages.length - 1]?.content ?? "";
