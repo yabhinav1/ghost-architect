@@ -45,7 +45,7 @@ async function LandingBody({ searchParams }: { searchParams: Promise<{ error?: s
           <div className="flex justify-center">
             <div className="relative">
               <div className="absolute inset-0 -z-10 rounded-full bg-accent-emphasis/20 blur-3xl" />
-              <Mascot size={300} float />
+              <Mascot size={300} float track />
             </div>
           </div>
         </section>
