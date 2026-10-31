@@ -1,4 +1,4 @@
-import { scoreFiles } from "./score";
+import { scoreFiles } from "./score.ts";
 import type { Analysis, FileStat, HandoverItem, Receiver, Scored } from "./types";
 
 const MONTH_MS = 30.44 * 24 * 3600 * 1000;
@@ -94,4 +94,66 @@ export function decayCurve(files: FileStat[], email: string, months = 12): { las
     points.push({ month: m, absorbed: touched / mine.length });
   }
   return { lastCommit: last, files: mine.length, points };
+}
+
+export type PortfolioSummary = {
+  slug: string;
+  repoUrl: string;
+  analyzedAt: string;
+  files: number;
+  authors: number;
+  /** people needed to cover half of all blame lines */
+  busFactor: number;
+  /** share of lines owned by the single biggest author */
+  topShare: number;
+  topAuthor: string;
+  /** files where one person owns 90% or more of the lines */
+  singleOwnerFiles: number;
+  /** files with recent churn and a single owner: the ones that hurt if that person leaves */
+  fragileFiles: number;
+  reddest: string | null;
+  level: "fragile" | "watch" | "healthy";
+};
+
+/** Knowledge-concentration summary for one repo, independent of any departed list. */
+export function portfolioSummary(analysis: Analysis): PortfolioSummary {
+  const totalLines = analysis.files.reduce((s, f) => s + f.lines, 0);
+  const ranked = Object.entries(analysis.authors).sort((a, b) => b[1].lines - a[1].lines);
+  let cum = 0;
+  let busFactor = 0;
+  for (const [, a] of ranked) {
+    cum += a.lines;
+    busFactor++;
+    if (cum >= totalLines * 0.5) break;
+  }
+  const top = ranked[0];
+  const topShare = top && totalLines ? top[1].lines / totalLines : 0;
+  let singleOwnerFiles = 0;
+  let fragileFiles = 0;
+  let reddest: { path: string; raw: number } | null = null;
+  for (const f of analysis.files) {
+    const max = Math.max(0, ...Object.values(f.authors));
+    const share = f.lines ? max / f.lines : 0;
+    if (share >= 0.9) {
+      singleOwnerFiles++;
+      const raw = share * Math.log(1 + f.commits12m) * (1 + f.inbound);
+      if (f.commits12m > 0) fragileFiles++;
+      if (!reddest || raw > reddest.raw) reddest = { path: f.path, raw };
+    }
+  }
+  const level: PortfolioSummary["level"] = busFactor <= 1 || topShare >= 0.6 ? "fragile" : busFactor <= 3 || topShare >= 0.4 ? "watch" : "healthy";
+  return {
+    slug: analysis.repoUrl.replace(/^https?:\/\/(www\.)?github\.com\//i, ""),
+    repoUrl: analysis.repoUrl,
+    analyzedAt: analysis.analyzedAt,
+    files: analysis.analysedFiles,
+    authors: ranked.length,
+    busFactor,
+    topShare,
+    topAuthor: top ? top[1].name : "",
+    singleOwnerFiles,
+    fragileFiles,
+    reddest: reddest?.path ?? null,
+    level,
+  };
 }

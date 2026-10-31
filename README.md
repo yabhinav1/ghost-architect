@@ -39,6 +39,9 @@ Both modes share the same engine and the same heatmap.
 
 ## Extras
 
+- **Risk across your repositories.** The dashboard scans your most recent non-fork repos and shows a tile per repo: bus factor, top owner share, fragile files, and the riskiest path, each labelled fragile, watch, or healthy. One click into the full heatmap.
+- **Handover export.** The handover plan downloads as Markdown, with the generated briefs and evidence links, ready for Notion, Confluence, or a PR description.
+
 - **Ask the ghost.** A question box on any file that answers only from that file's commits and PRs, cites evidence IDs, and says "not documented" when nothing explains it.
 - **Time machine.** A slider under the heatmap that rescores the repo as of any month in the last 30 months, from commit timelines (blame is not available for the past, so it is labelled commit-based).
 - **Knowledge absorption.** For each departed author, the share of their files someone else has edited in the months since their last commit. Flat and low means the knowledge is rotting.
@@ -80,6 +83,13 @@ The app shells out to `git` and writes to `.cache/`, so it needs a real filesyst
 4. **Live override.** Mark one author as still here and watch the map cool down.
 5. **Time machine.** Drag the slider back a year to show the bus factor was already bad.
 6. **Download CODEOWNERS** and open the report.
+
+## Safety on a public host
+
+- Repos over 300 MB (configurable with `MAX_REPO_MB`) are refused before cloning, using the GitHub API's size field. If GitHub rate-limits the size check, the clone is refused rather than risked.
+- `deploy/keepalive.yml` is a GitHub Actions workflow that pings the live site every 10 minutes so the free Render instance never sleeps before a demo. Copy it to `.github/workflows/` (GitHub requires the `workflow` permission to push that path, so do it from the GitHub web UI or your own terminal), or point a free UptimeRobot monitor at the site instead.
+- `npm run warm -- --remote https://your-site` pre-analyses the sample repos on the live server.
+- `npm test` runs 12 unit tests over scoring, receivers, CODEOWNERS, the time machine, absorption curves, and the portfolio summary.
 
 ## Honest limits
 

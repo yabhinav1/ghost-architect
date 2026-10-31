@@ -195,12 +195,12 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
     <div className="min-h-screen">
       {/* Top bar */}
       <header className="sticky top-0 z-30 border-b border-border bg-canvas-inset/95 backdrop-blur">
-        <div className="mx-auto flex max-w-[1400px] items-center gap-3 px-4 py-2.5">
+        <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-2 px-3 py-2 sm:gap-3 sm:px-4">
           <Link href={user ? "/dashboard" : "/"} className="flex items-center gap-2 font-semibold">
             <Mark size={26} className="text-fg" />
             <span className="hidden sm:inline">Ghost-Architect</span>
           </Link>
-          <form onSubmit={(e) => { e.preventDefault(); analyze(false); }} className="ml-2 flex min-w-0 flex-1 items-center gap-2">
+          <form onSubmit={(e) => { e.preventDefault(); analyze(false); }} className="order-last flex w-full min-w-0 items-center gap-2 sm:order-none sm:ml-2 sm:w-auto sm:flex-1">
             <div className="relative min-w-0 flex-1 max-w-xl">
               <Octicon name="search" className="pointer-events-none absolute left-2.5 top-2 h-4 w-4 text-fg-subtle" />
               <input value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} className="input pl-8 font-mono text-[13px]" placeholder="https://github.com/owner/repo" spellCheck={false} />
@@ -223,7 +223,7 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
       {/* Repo header strip */}
       {analysis && (
         <div className="border-b border-border bg-canvas-subtle">
-          <div className="mx-auto max-w-[1400px] px-4 pt-4 pb-0">
+          <div className="mx-auto max-w-[1400px] px-3 pt-4 pb-0 sm:px-4">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
               <Octicon name="repo" className="h-4 w-4 text-fg-muted" />
               <h1 className="text-xl font-semibold">
@@ -239,7 +239,7 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
                 <button onClick={() => analyze(true)} disabled={loading} className="btn btn-sm btn-invisible" title="Re-clone and re-analyse"><Octicon name="history" className="h-3.5 w-3.5" /></button>
               </span>
             </div>
-            <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-[13px] text-fg-muted">
+            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-fg-muted sm:text-[13px]">
               <span className="flex items-center gap-1.5"><Octicon name="file" className="h-4 w-4" /><b className="text-fg">{analysis.analysedFiles}</b> of {analysis.totalFiles} code files</span>
               <span className="flex items-center gap-1.5"><Octicon name="people" className="h-4 w-4" /><b className="text-fg">{Object.keys(analysis.authors).length}</b> authors</span>
               <span className="flex items-center gap-1.5"><Octicon name="people" className="h-4 w-4 text-danger" /><b className="text-fg">{departed.size}</b> departed</span>
@@ -264,7 +264,7 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
         </div>
       )}
 
-      <main className="mx-auto max-w-[1400px] px-4 py-5">
+      <main className="mx-auto max-w-[1400px] px-3 py-4 sm:px-4 sm:py-5">
         {error && (
           <div className="mb-4 flex items-start gap-2 rounded-md border border-danger/40 bg-danger-muted px-3 py-2 text-[13px] text-fg">
             <Octicon name="flame" className="mt-0.5 h-4 w-4 text-danger" />

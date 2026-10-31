@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Mark } from "@/components/Mascot";
+import { Portfolio } from "@/components/Portfolio";
 import { RepoList } from "@/components/RepoList";
 import { Octicon } from "@/components/ui";
 import { UserMenu } from "@/components/UserMenu";
@@ -41,7 +42,7 @@ async function DashboardBody() {
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-[1200px] gap-6 px-4 py-6 lg:grid-cols-[280px_1fr]">
+      <main className="mx-auto grid max-w-[1200px] gap-5 px-4 py-5 lg:grid-cols-[280px_1fr]">
         <aside className="stagger space-y-4">
           <div className="card p-4">
             <div className="flex items-center gap-3">
@@ -100,6 +101,7 @@ async function DashboardBody() {
               <a href={installUrl} className={`btn btn-sm ${needsInstall ? "btn-primary" : ""}`}>{needsInstall ? "Install on my repositories" : "Manage access"}</a>
             </div>
           )}
+          <Portfolio repos={repos.filter((r) => r.owner.login === user.login)} />
           <RepoList repos={repos} />
         </section>
       </main>

@@ -43,7 +43,7 @@ export function RepoList({ repos }: { repos: Repo[] }) {
   return (
     <div>
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[220px] flex-1">
+        <div className="relative w-full min-w-[200px] flex-1 sm:w-auto">
           <Octicon name="search" className="pointer-events-none absolute left-2.5 top-2 h-4 w-4 text-fg-subtle" />
           <input value={q} onChange={(e) => setQ(e.target.value)} className="input pl-8" placeholder="Find a repository…" autoFocus />
         </div>

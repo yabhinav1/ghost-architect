@@ -10,6 +10,8 @@ const CACHE = path.join(process.cwd(), ".cache");
 const MAX_FILES = 250;
 const BLAME_CONCURRENCY = 8;
 const MAX_BUFFER = 256 * 1024 * 1024;
+/** Refuse to clone anything bigger than this (GitHub reports size in KB). Protects small hosts. */
+export const MAX_REPO_KB = Number(process.env.MAX_REPO_MB ?? 300) * 1024;
 /** History window. Keeps the one-pass git log bounded on very large repos. */
 const HISTORY_WINDOW = "3.years";
 const TIMELINE_CAP = 300;
@@ -61,6 +63,31 @@ function authArgs(token?: string): string[] {
   return ["-c", `http.extraheader=AUTHORIZATION: basic ${basic}`];
 }
 
+/** For GitHub repos, check existence and size before cloning. Other hosts are cloned blind. */
+async function preflight(url: string, token?: string): Promise<void> {
+  const m = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)$/);
+  if (!m) return;
+  const headers: Record<string, string> = { Accept: "application/vnd.github+json", "User-Agent": "ghost-architect" };
+  const t = token || process.env.GITHUB_TOKEN;
+  if (t) headers.Authorization = `Bearer ${t}`;
+  let res: Response;
+  try {
+    res = await fetch(`https://api.github.com/repos/${m[1]}/${m[2]}`, { headers });
+  } catch {
+    return; // network hiccup: let git decide
+  }
+  if (res.status === 404) throw new Error(token ? "Repository not found, or your account cannot see it." : "Repository not found. If it is private, sign in with GitHub first.");
+  if (res.status === 403 || res.status === 429) {
+    // Without a size we cannot clone safely on a small host.
+    throw new Error("GitHub is rate-limiting this server right now, so the repository size cannot be checked. Sign in with GitHub, or try again in a few minutes.");
+  }
+  if (!res.ok) return;
+  const info = (await res.json()) as { size?: number; full_name?: string };
+  if (info.size && info.size > MAX_REPO_KB) {
+    throw new Error(`${info.full_name ?? "This repository"} is ${Math.round(info.size / 1024)} MB. The limit on this server is ${Math.round(MAX_REPO_KB / 1024)} MB. Try a smaller repo, or run Ghost-Architect locally for big ones.`);
+  }
+}
+
 export async function ensureClone(repoUrl: string, onProgress?: OnProgress, token?: string): Promise<string> {
   const url = normalizeRepoUrl(repoUrl);
   const dir = path.join(CACHE, "repos", repoKey(url));
@@ -68,6 +95,8 @@ export async function ensureClone(repoUrl: string, onProgress?: OnProgress, toke
     onProgress?.({ step: "Using cached clone" });
     return dir;
   }
+  onProgress?.({ step: "Checking repository" });
+  await preflight(url, token);
   onProgress?.({ step: "Cloning repository" });
   await fs.mkdir(path.dirname(dir), { recursive: true });
   try {

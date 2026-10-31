@@ -1,0 +1,13 @@
+# Keeps the free Render instance from sleeping. Render spins down after 15 idle minutes;
+# a request every 10 minutes keeps the demo warm. Delete this file if you move off the free tier.
+name: keepalive
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping the live site
+        run: curl -fsS -o /dev/null --max-time 90 "${{ vars.APP_URL || 'https://ghost-architect.onrender.com' }}/" && echo "awake"
