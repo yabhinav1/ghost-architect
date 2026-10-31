@@ -5,6 +5,9 @@ import { appOrigin, randomState, sessionCookieOptions, STATE_COOKIE } from "@/li
 const ROLES = new Set(["user", "org", "admin"]);
 
 export async function GET(request: Request) {
+  if (process.env.NODE_ENV !== "development" && !(process.env.AUTH_SECRET?.trim() || process.env.GITHUB_CLIENT_SECRET?.trim())) {
+    return Response.json({ error: "Sign-in is not configured safely. Set AUTH_SECRET on the server, then try again." }, { status: 503 });
+  }
   const as = new URL(request.url).searchParams.get("as") ?? "user";
   const { config: cfg, problem } = await getActiveAppConfig();
   // No usable credentials (fresh machine, or the host's secret is wrong): create a GitHub App with one click, then come back here.

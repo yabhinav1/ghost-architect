@@ -10,6 +10,9 @@ import { storeEnabled } from "@/lib/store";
  */
 export async function GET() {
   const out: Record<string, unknown> = { ok: true, checkedAt: new Date().toISOString() };
+  const hasSessionSecret = Boolean(process.env.AUTH_SECRET?.trim() || process.env.GITHUB_CLIENT_SECRET?.trim());
+  out.session = { status: hasSessionSecret ? "configured" : process.env.NODE_ENV === "development" ? "temporary" : "missing", hint: hasSessionSecret ? undefined : "Set AUTH_SECRET to a long random value before enabling production sign-in." };
+  if (!hasSessionSecret && process.env.NODE_ENV !== "development") out.ok = false;
 
   const cfg = getAppConfig();
   if (!cfg) out.oauth = { status: "missing", hint: "Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET, or run /setup." };

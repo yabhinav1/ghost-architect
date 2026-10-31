@@ -20,6 +20,8 @@ The LLM is only used for the "why does this code exist" brief. Everything else i
 
 Optional: set `GITHUB_TOKEN` so PR lookups get 5000 requests/hour instead of 60.
 
+Repository URLs must use HTTPS on `github.com`. Other hosts and custom ports are rejected. Use the current repository URL after a rename; authenticated git requests do not follow redirects.
+
 ## Sign in with GitHub
 
 Click **Sign in with GitHub** on the landing page. The first time on a machine it goes to `/setup`, where one click creates a GitHub App called Ghost-Architect on your account (GitHub prefills everything from a manifest) and sends you straight into the login. The credentials land in `.cache/github-app.json` and `.env.local`. After that, every user signs in with their normal GitHub account and lands on the dashboard.
@@ -27,6 +29,8 @@ Click **Sign in with GitHub** on the landing page. The first time on a machine i
 The dashboard lists every repository you can see. Private ones appear once the app is installed on them, which is the "Install on my repositories" button at the top of the dashboard, one click, pick "All repositories". Private repos are cloned with your token for that request only; the token lives in an encrypted, httpOnly cookie and is never written to disk.
 
 If you already have an OAuth App, set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` in `.env.local` instead and `/setup` is skipped.
+
+Production sign-in requires `AUTH_SECRET` (a long random value) or `GITHUB_CLIENT_SECRET`; there is no built-in fallback secret. The Render blueprint generates `AUTH_SECRET` automatically. For local development without either value, sessions use a random key and expire when the server restarts. `/api/health` reports missing production session configuration.
 
 Routes: `/` landing, `/setup` one-time app creation, `/dashboard` your repos, `/r/owner/name` analysis, `/analyse` any public repo without signing in.
 
@@ -43,6 +47,8 @@ Sign in from the menu at the top right of the landing page as a **User**, an **O
 Routes: `/org` your organisations, `/org/<slug>` overview, `/org/<slug>/activity`, `/org/<slug>/notices`, `/org/<slug>/handovers`, `/org/<slug>/settings`, `/me` inbox and handovers, `/invite/<token>` join, `/letter/<id>` printable notice, `/admin`.
 
 Records (organisations, members, invites, notices, handovers, audit) are JSON documents under `.cache/db/`, mirrored to Upstash when configured.
+
+Organisation records and their indexes do not expire in Upstash. Startup repairs missing indexes from surviving local records and removes the old expiry from discoverable records. Partial recovery merges local and remote indexes. Configured durable-store failures are reported instead of silently claiming a successful save. This document store supports a single application server; multiple replicas need a shared transactional database. Data already lost from both local storage and Redis cannot be recovered by this repair.
 
 ## Accounts and access
 
@@ -100,6 +106,8 @@ npm run warm -- https://github.com/org/repo   # or your own
 
 Clones and analysis are cached in `.cache/`, so after warming, the stage demo only touches the network for the LLM brief and PR lookups.
 
+The refresh button fetches the latest default branch before recalculating the analysis. If fetching fails, it reports an error and keeps the previous analysis. `GHOST_CACHE_DIR` can move runtime data to a persistent volume; it defaults to `.cache/`. Runtime data is excluded from lint, TypeScript checks and production file tracing.
+
 ## Deploy
 
 The app shells out to `git` and writes to `.cache/`, so it needs a real filesystem: run it on a laptop, or on Railway, Fly, or Render with the included `Dockerfile`. It will not work on Vercel's serverless functions.
@@ -131,7 +139,7 @@ The app shells out to `git` and writes to `.cache/`, so it needs a real filesyst
 - On a shared host like Render, set `GITHUB_TOKEN` to a fine-grained personal access token with public read access. Anonymous GitHub API calls share one 60/hour quota per IP, which other tenants exhaust; a token gives the server 5000/hour for size checks and PR evidence.
 - `deploy/keepalive.yml` is a GitHub Actions workflow that pings the live site every 10 minutes so the free Render instance never sleeps before a demo. Copy it to `.github/workflows/` (GitHub requires the `workflow` permission to push that path, so do it from the GitHub web UI or your own terminal), or point a free UptimeRobot monitor at the site instead.
 - `npm run warm -- --remote https://your-site` pre-analyses the sample repos on the live server.
-- `npm test` runs 12 unit tests over scoring, receivers, CODEOWNERS, the time machine, absorption curves, and the portfolio summary.
+- `npm test` covers scoring, access rules, imports, repository URL validation, session encryption, durable-record recovery and expiry, and refreshing a real temporary Git repository. `npm run lint` and `npm run build` check the application separately from downloaded repository contents.
 
 ## Honest limits
 

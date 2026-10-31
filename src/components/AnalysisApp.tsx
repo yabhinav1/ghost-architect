@@ -328,7 +328,7 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
                   {user ? (saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved to your account" : saveState === "error" ? "Not saved" : saveState === "loading" ? "Loading your scenario…" : "") : "Sign in to save"}
                 </span>
                 <button onClick={() => setTourOpen(true)} className="btn btn-sm btn-invisible" title="Guided tour">Tour</button>
-                <button onClick={() => analyze(true)} disabled={loading} className="btn btn-sm btn-invisible" title="Re-clone and re-analyse"><Octicon name="history" className="h-3.5 w-3.5" /></button>
+                <button onClick={() => analyze(true)} disabled={loading} className="btn btn-sm btn-invisible" title="Fetch latest changes and re-analyse"><Octicon name="history" className="h-3.5 w-3.5" /></button>
               </span>
             </div>
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-fg-muted sm:text-[13px]">

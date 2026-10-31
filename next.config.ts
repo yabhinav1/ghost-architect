@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Runtime repository data is not application source or a deployment dependency.
+  outputFileTracingExcludes: { "/*": ["./.cache/**/*"] },
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

@@ -34,7 +34,7 @@ async function cachedPrivateFlag(url: string): Promise<boolean | undefined> {
   }
 }
 
-/** Who may see this repository's analysis. Non-GitHub URLs are treated as public. */
+/** Who may see this repository's analysis. Only canonical HTTPS GitHub URLs are accepted. */
 export async function authorizeRepo(repoUrl: string): Promise<AccessDecision> {
   let url: string;
   try {
@@ -44,7 +44,7 @@ export async function authorizeRepo(repoUrl: string): Promise<AccessDecision> {
   }
   const session = await getSession();
   const m = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)$/);
-  if (!m) return { ok: true, session, visibility: "public" };
+  if (!m) return { ok: false, status: 400, message: "Only HTTPS GitHub repositories are supported." };
 
   // With a session the user's own token answers "can I see it?" directly; without one the server token answers "is it public?".
   const key = `${session?.login ?? "-"}:${url}`;

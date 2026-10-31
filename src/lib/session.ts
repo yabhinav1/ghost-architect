@@ -1,4 +1,6 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
+import { unseal } from "./session-crypto.ts";
+export { seal, unseal } from "./session-crypto.ts";
 import { cookies } from "next/headers";
 import type { SessionUser } from "./types.ts";
 
@@ -7,32 +9,6 @@ export type Session = SessionUser & { token: string; expiresAt?: number };
 export const SESSION_COOKIE = "gh_session";
 export const STATE_COOKIE = "gh_oauth_state";
 const SESSION_DAYS = 7;
-
-function key(): Buffer {
-  const secret = process.env.AUTH_SECRET || process.env.GITHUB_CLIENT_SECRET || "ghost-architect-dev-secret";
-  return createHash("sha256").update(secret).digest();
-}
-
-export function seal(obj: unknown): string {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", key(), iv);
-  const enc = Buffer.concat([cipher.update(JSON.stringify(obj), "utf8"), cipher.final()]);
-  return Buffer.concat([iv, cipher.getAuthTag(), enc]).toString("base64url");
-}
-
-export function unseal<T>(sealed: string): T | null {
-  try {
-    const buf = Buffer.from(sealed, "base64url");
-    const iv = buf.subarray(0, 12);
-    const tag = buf.subarray(12, 28);
-    const enc = buf.subarray(28);
-    const decipher = createDecipheriv("aes-256-gcm", key(), iv);
-    decipher.setAuthTag(tag);
-    return JSON.parse(Buffer.concat([decipher.update(enc), decipher.final()]).toString("utf8")) as T;
-  } catch {
-    return null;
-  }
-}
 
 export function sessionCookieOptions(maxAgeSeconds = SESSION_DAYS * 86400) {
   return { httpOnly: true, sameSite: "lax" as const, secure: process.env.NODE_ENV === "production", path: "/", maxAge: maxAgeSeconds };

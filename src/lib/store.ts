@@ -27,24 +27,27 @@ async function cmd(args: (string | number)[]): Promise<unknown> {
   return j.result;
 }
 
-export async function storeGet<T>(key: string): Promise<T | null> {
+export async function storeGet<T>(key: string, options: { strict?: boolean } = {}): Promise<T | null> {
   if (!storeEnabled) return null;
   try {
     const packed = (await cmd(["GET", key])) as string | null;
     if (!packed) return null;
     return JSON.parse(gunzipSync(Buffer.from(packed, "base64")).toString("utf8")) as T;
-  } catch {
+  } catch (error) {
+    if (options.strict) throw error;
     return null;
   }
 }
 
-export async function storeSet(key: string, value: unknown): Promise<void> {
+export async function storeSet(key: string, value: unknown, options: { persistent?: boolean } = {}): Promise<void> {
   if (!storeEnabled) return;
   try {
     const packed = gzipSync(Buffer.from(JSON.stringify(value), "utf8")).toString("base64");
-    if (packed.length > MAX_BYTES) return; // too big for the free tier; local cache still has it
-    await cmd(["SET", key, packed, "EX", TTL_SEC]);
-  } catch {
-    // best effort
+    if (packed.length > MAX_BYTES) throw new Error("Record exceeds the durable store size limit");
+    // Business records and indexes must survive inactivity. Only derived caches expire.
+    await cmd(options.persistent ? ["SET", key, packed] : ["SET", key, packed, "EX", TTL_SEC]);
+  } catch (error) {
+    if (options.persistent) throw error;
+    // Derived caches are best effort; durable writes must report failures to the caller.
   }
 }

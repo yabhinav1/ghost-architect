@@ -9,7 +9,7 @@ import { storeGet, storeSet } from "./store.ts";
 import type { Analysis, CommitEntry, FileStat, Progress } from "./types.ts";
 
 const run = promisify(execFile);
-const CACHE = path.join(process.cwd(), ".cache");
+const CACHE = process.env.GHOST_CACHE_DIR || path.join(/* turbopackIgnore: true */ process.cwd(), ".cache");
 const MAX_FILES = 250;
 /** Parallel git blame processes. Keep this low on small hosts: each blame streams but git itself uses memory. */
 const BLAME_CONCURRENCY = Math.max(1, Number(process.env.BLAME_CONCURRENCY ?? (process.env.RENDER ? 3 : 8)));
@@ -36,22 +36,17 @@ const SKIP_FILES = /(\.min\.js|\.d\.ts|\.lock|package-lock\.json|yarn\.lock|\.sn
 type OnProgress = (p: Progress) => void;
 
 export function normalizeRepoUrl(input: string): string {
-  let url = input.trim();
-  if (!/^https?:\/\//i.test(url)) throw new Error("Repo URL must start with https://");
-  url = url.replace(/\/+$/, "").replace(/\.git$/, "");
-  const u = new URL(url);
-  u.hostname = u.hostname.toLowerCase().replace(/^www\./, "");
-  u.search = "";
-  u.hash = "";
-  u.username = "";
-  u.password = "";
-  if (u.hostname === "github.com") {
-    // GitHub owner and repo names are case-insensitive; one canonical form means one cache entry and one access check.
-    const parts = u.pathname.split("/").filter(Boolean);
-    if (parts.length < 2) throw new Error("GitHub URL must look like https://github.com/owner/repo");
-    u.pathname = "/" + parts.slice(0, 2).join("/").toLowerCase();
+  if (typeof input !== "string") throw new Error("Repository URL must be a string");
+  const u = new URL(input.trim());
+  if (u.protocol !== "https:" || !["github.com", "www.github.com"].includes(u.hostname) || u.port) {
+    throw new Error("Only HTTPS GitHub repositories are supported: https://github.com/owner/repo");
   }
-  return u.toString().replace(/\/+$/, "");
+  const [owner, rawRepo] = u.pathname.split("/").filter(Boolean);
+  const repo = rawRepo?.replace(/\.git$/i, "");
+  if (!owner || !repo || !/^[a-z0-9-]+$/i.test(owner) || !/^[a-z0-9_.-]+$/i.test(repo) || repo === "." || repo === "..") {
+    throw new Error("GitHub URL must look like https://github.com/owner/repo");
+  }
+  return `https://github.com/${owner}/${repo}`.toLowerCase();
 }
 
 /** A path inside the repo working tree: relative, no traversal, no absolute or drive-letter forms. */
@@ -68,7 +63,8 @@ export function repoKey(repoUrl: string): string {
 }
 
 export function cacheDir(...parts: string[]): string {
-  return path.join(CACHE, ...parts);
+  // These files are created at runtime, not assets to package in the server bundle.
+  return path.join(/* turbopackIgnore: true */ CACHE, ...parts);
 }
 
 async function exists(p: string): Promise<boolean> {
@@ -87,12 +83,14 @@ async function git(dir: string, args: string[]): Promise<string> {
 
 /** Auth header for a one-off clone. The token is never written to .git/config. */
 function authArgs(token?: string): string[] {
-  if (!token) return [];
+  // Never follow a redirect with credentials; renamed repositories must use their new URL.
+  const args = ["-c", "http.followRedirects=false", "-c", "credential.helper="];
+  if (!token) return args;
   const basic = Buffer.from(`x-access-token:${token}`).toString("base64");
-  return ["-c", `http.extraheader=AUTHORIZATION: basic ${basic}`];
+  return [...args, "-c", `http.https://github.com/.extraheader=AUTHORIZATION: basic ${basic}`];
 }
 
-/** For GitHub repos, check existence and size before cloning. Other hosts are cloned blind. Returns the private flag when known. */
+/** Check existence and size before cloning or refreshing. Returns the private flag when known. */
 async function preflight(url: string, token?: string): Promise<boolean | undefined> {
   if (process.env.GHOST_SKIP_PREFLIGHT === "1") return undefined;
   const m = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)$/);
@@ -134,10 +132,26 @@ async function visibilityOf(url: string, token?: string): Promise<boolean | unde
 
 const knownPrivate = new Map<string, boolean | undefined>();
 
-export async function ensureClone(repoUrl: string, onProgress?: OnProgress, token?: string): Promise<string> {
+export async function ensureClone(repoUrl: string, onProgress?: OnProgress, token?: string, refresh = false): Promise<string> {
   const url = normalizeRepoUrl(repoUrl);
-  const dir = path.join(CACHE, "repos", repoKey(url));
+  const dir = cacheDir("repos", repoKey(url));
   if (await exists(path.join(dir, ".git"))) {
+    if (refresh) {
+      onProgress?.({ step: "Fetching latest repository changes" });
+      knownPrivate.set(url, await preflight(url, token));
+      try {
+        // Fetch the current default branch explicitly, including if GitHub changed its name.
+        await run("git", [...authArgs(token), "fetch", "--quiet", "--no-tags", url + ".git", "HEAD"], {
+          cwd: dir, timeout: 120_000, maxBuffer: 4 * 1024 * 1024, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+        });
+        // This is an app-owned cache, never the user's working repository.
+        await git(dir, ["reset", "--hard", "FETCH_HEAD"]);
+      } catch {
+        // execFile errors include argv, which contains a token: never return or log them.
+        throw new Error("Could not refresh the repository. Check your GitHub access and try again.");
+      }
+      return dir;
+    }
     onProgress?.({ step: "Using cached clone" });
     return dir;
   }
@@ -173,7 +187,7 @@ async function dirKb(dir: string): Promise<number> {
  */
 function cloneWithLimit(url: string, dir: string, token: string | undefined, onProgress?: OnProgress): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn("git", [...authArgs(token), "clone", "--quiet", "--no-tags", url + ".git", dir], { stdio: ["ignore", "ignore", "pipe"] });
+    const child = spawn("git", [...authArgs(token), "clone", "--quiet", "--no-tags", url + ".git", dir], { stdio: ["ignore", "ignore", "pipe"], env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } });
     let stderr = "";
     child.stderr?.on("data", (d) => { stderr += String(d); });
     let killed: string | null = null;
@@ -283,7 +297,7 @@ async function importGraph(dir: string, files: string[]): Promise<Map<string, Se
 export async function analyzeRepo(repoUrl: string, force = false, onProgress?: OnProgress, token?: string): Promise<Analysis> {
   const url = normalizeRepoUrl(repoUrl);
   const key = repoKey(url);
-  const cachePath = path.join(CACHE, "analysis", key + ".json");
+  const cachePath = cacheDir("analysis", key + ".json");
   if (!force && (await exists(cachePath))) {
     onProgress?.({ step: "Loaded from cache" });
     return JSON.parse(await fs.readFile(cachePath, "utf8")) as Analysis;
@@ -299,7 +313,7 @@ export async function analyzeRepo(repoUrl: string, force = false, onProgress?: O
     }
   }
 
-  const dir = await ensureClone(url, onProgress, token);
+  const dir = await ensureClone(url, onProgress, token, force);
   onProgress?.({ step: "Listing files" });
   const all = (await git(dir, ["ls-files"])).split("\n").filter(Boolean);
   const code = all.filter(isCodeFile);
