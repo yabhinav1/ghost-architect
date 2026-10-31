@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ActionScene } from "@/components/ActionScene";
 import { DeviceLogin } from "@/components/DeviceLogin";
 import { Mascot } from "@/components/Mascot";
 import { Octicon } from "@/components/ui";
@@ -64,6 +65,8 @@ async function LandingBody({ searchParams }: { searchParams: Promise<{ error?: s
             </div>
           ))}
         </section>
+
+        <ActionScene />
       </main>
       <footer className="mx-auto max-w-6xl px-6 py-6 text-[12px] text-fg-subtle">Built at hackCBS 2026. Blame shows who last edited a line, not who understood it; Ghost-Architect blends it with commit history and always shows its evidence.</footer>
     </div>
