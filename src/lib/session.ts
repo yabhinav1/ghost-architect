@@ -57,3 +57,12 @@ export async function getUser(): Promise<SessionUser | null> {
 export function randomState(): string {
   return randomBytes(16).toString("hex");
 }
+
+/** Public origin of this deployment: APP_URL if set, else the proxy's forwarded headers, else the request itself. */
+export function appOrigin(request: Request): string {
+  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/+$/, "");
+  const h = request.headers;
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const proto = h.get("x-forwarded-proto") ?? (host?.startsWith("localhost") ? "http" : "https");
+  return host ? `${proto}://${host}` : new URL(request.url).origin;
+}

@@ -1,0 +1,25 @@
+# One-click deploy on Render: https://render.com/deploy
+services:
+  - type: web
+    name: ghost-architect
+    runtime: docker
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: LLM_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: LLM_MODEL
+        value: openai/gpt-oss-120b
+      - key: LLM_API_KEY
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: APP_URL
+        sync: false
