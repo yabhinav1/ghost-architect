@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
   // Only repos this account can see, as listed by their own token.
-  const mine = new Set((await listRepos(session.token)).repos.map((r) => r.html_url.toLowerCase()));
+  const mine = new Set(session.token ? (await listRepos(session.token)).repos.map((r) => r.html_url.toLowerCase()) : []);
   const repos = (body.repos ?? []).filter((r) => mine.has(String(r).toLowerCase().replace(/\/+$/, ""))).slice(0, 50);
   const out: Record<string, ReturnType<typeof portfolioSummary> | null> = {};
   await Promise.all(

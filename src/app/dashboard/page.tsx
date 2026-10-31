@@ -19,7 +19,7 @@ export const metadata = { title: "Your repositories · Ghost-Architect" };
 async function DashboardBody() {
   const session = await getSession();
   if (!session) redirect("/");
-  const [listing, recent] = await Promise.all([listRepos(session.token), recentForUser(session.login)]);
+  const [listing, recent] = await Promise.all([session.token ? listRepos(session.token) : Promise.resolve({ repos: [], installations: 0 }), recentForUser(session.login)]);
   const repos = listing.repos;
   const cfg = getAppConfig();
   const installUrl = cfg?.kind === "github-app" && cfg.slug ? `https://github.com/apps/${cfg.slug}/installations/new` : null;

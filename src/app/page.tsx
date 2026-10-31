@@ -11,6 +11,7 @@ async function LandingBody({ searchParams }: { searchParams: Promise<{ error?: s
   const user = await getUser();
   if (user) redirect("/dashboard");
   const { error } = await searchParams;
+  const devLogin = process.env.NODE_ENV !== "production" && process.env.DEV_LOGIN === "1";
 
   return (
     <div className="hero-glow min-h-screen">
@@ -49,6 +50,18 @@ async function LandingBody({ searchParams }: { searchParams: Promise<{ error?: s
               <Link href="/analyse" className="btn !px-5 !py-2.5 !text-[15px]">Analyse a public repo</Link>
             </div>
             <p className="mt-3 text-[12px] text-fg-subtle">Read-only access to your repositories. Nothing is written back. Sign out anytime. Signing in as an organisation or admin is in the menu at the top right.</p>
+            {devLogin && (
+              <div className="mt-4 rounded-md border border-attention/40 bg-attention-muted px-3 py-2 text-[12px]">
+                <p className="font-semibold">Developer sign-in (this machine only, no GitHub)</p>
+                <p className="text-fg-muted">Test users for the three dashboards. Public repos only.</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <a href="/api/auth/dev?login=alice&name=Alice%20Owner&as=org" className="btn btn-sm">alice · organisation owner</a>
+                  <a href="/api/auth/dev?login=bob&name=Bob%20Engineer&as=user" className="btn btn-sm">bob · engineer</a>
+                  <a href="/api/auth/dev?login=carol&name=Carol%20Admin&as=admin" className="btn btn-sm">carol · platform admin</a>
+                  <a href="/api/auth/dev?login=yabhinav1&name=Abhinav%20Yadav&as=admin" className="btn btn-sm">yabhinav1 · admin</a>
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex justify-center">
             <div className="relative">

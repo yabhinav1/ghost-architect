@@ -43,7 +43,7 @@ export async function getSession(): Promise<Session | null> {
   const raw = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!raw) return null;
   const s = unseal<Session>(raw);
-  if (!s || !s.token || !s.login) return null;
+  if (!s || !s.login) return null; // dev sessions have an empty token: signed in, but no GitHub access
   if (s.expiresAt && Date.now() > s.expiresAt) return null; // GitHub App user tokens expire; sign in again (one click)
   return s;
 }
