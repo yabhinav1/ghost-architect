@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AskGhost } from "@/components/AskGhost";
-import { RepositoryAssistantContext } from "@/components/AssistantProvider";
+import { Assistant } from "@/components/Assistant";
 import { DecayChart } from "@/components/DecayChart";
 import { HandoverPanel } from "@/components/HandoverPanel";
 import { PrCheck } from "@/components/PrCheck";
@@ -12,13 +12,11 @@ import { Tour, type TourStep } from "@/components/Tour";
 import { Treemap } from "@/components/Treemap";
 import { Avatar, Card, Octicon, ShareBar } from "@/components/ui";
 import { Mark } from "@/components/Mascot";
-import { MascotLoader } from "@/components/MascotLoader";
-import { CommitActivity } from "@/components/CommitActivity";
 import { UserMenu } from "@/components/UserMenu";
 import { codeownersText, scoreFilesAt } from "@/lib/insights";
 import { downloadTreemapPng } from "@/lib/treemap-image";
 import { scoreColor, scoreFiles } from "@/lib/score";
-import type { Analysis, Brief, BriefResult, Evidence, Progress, RepoState, Scored, SessionUser } from "@/lib/types";
+import type { Analysis, Brief, BriefResult, Evidence, Progress, Scored, SessionUser } from "@/lib/types";
 
 type Mode = "layoffs" | "notice";
 const MONTHS_BACK = 30;
@@ -64,13 +62,8 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
   const [copied, setCopied] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [kt, setKt] = useState<Set<string>>(new Set());
-  const [saveState, setSaveState] = useState<"idle" | "loading" | "saving" | "saved" | "error">("idle");
-  const stateLoadedFor = useRef<string | null>(null);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const fileInput = useRef<HTMLInputElement>(null);
   const autoRan = useRef(false);
-  const pendingFile = useRef<string | null>(null);
 
   const departed = useMemo(() => {
     const set = mode === "notice" ? new Set(parseDeparted(noticeEmail)) : new Set(parseDeparted(departedText));
@@ -95,7 +88,6 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
     const repo = p.get("repo") ?? (autoRun ? initialRepo : null);
     if (!repo) return;
     autoRan.current = true;
-    pendingFile.current = p.get("file");
     const t = setTimeout(() => {
       setRepoUrl(repo);
       if (p.get("departed")) setDepartedText(p.get("departed")!.split(",").join("\n"));
@@ -106,46 +98,6 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
     }, 0);
     return () => clearTimeout(t);
   }, [autoRun, initialRepo]);
-
-  // Signed-in users get their scenario for this repo back: who left, who is leaving, KT ticks.
-  useEffect(() => {
-    if (!analysis || !user) return;
-    const repo = analysis.repoUrl;
-    if (stateLoadedFor.current === repo) return;
-    let cancelled = false;
-    setSaveState("loading");
-    fetch(`/api/me/state?repo=${encodeURIComponent(repo)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { state: RepoState | null } | null) => {
-        if (cancelled) return;
-        const st = d?.state;
-        if (st) {
-          setMode(st.mode);
-          setDepartedText(st.departed.join("\n"));
-          setStillHere(new Set(st.stillHere));
-          setNoticeEmail(st.noticeEmail);
-          setLastDay(st.lastDay);
-          setKt(new Set(st.kt));
-        }
-        stateLoadedFor.current = repo;
-        setSaveState(st ? "saved" : "idle");
-      })
-      .catch(() => { if (!cancelled) setSaveState("error"); });
-    return () => { cancelled = true; };
-  }, [analysis, user]);
-
-  useEffect(() => {
-    if (!analysis || !user || stateLoadedFor.current !== analysis.repoUrl) return;
-    clearTimeout(saveTimer.current);
-    setSaveState("saving");
-    const body = { repo: analysis.repoUrl, state: { mode, departed: parseDeparted(departedText), stillHere: [...stillHere], noticeEmail, lastDay, kt: [...kt] } };
-    saveTimer.current = setTimeout(() => {
-      fetch("/api/me/state", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
-        .then((r) => setSaveState(r.ok ? "saved" : "error"))
-        .catch(() => setSaveState("error"));
-    }, 800);
-    return () => clearTimeout(saveTimer.current);
-  }, [analysis, user, mode, departedText, stillHere, noticeEmail, lastDay, kt]);
 
   useEffect(() => {
     if (!analysis) return;
@@ -203,9 +155,6 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
       }
       if (!result) throw new Error("Server closed the stream without a result");
       setAnalysis(result);
-      const want = pendingFile.current;
-      if (want && result.files.some((f) => f.path === want)) setSelected(want);
-      pendingFile.current = null;
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -321,16 +270,13 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
                 <span className="mx-1 text-fg-muted">/</span>
                 <a href={analysis.repoUrl} target="_blank" className="text-accent hover:underline">{repoSlug(analysis.repoUrl).split("/")[1]}</a>
               </h1>
-              <span className={`label ${analysis.private ? "label-attention" : "label-muted"}`} title={analysis.private === undefined ? "Visibility could not be confirmed with GitHub" : undefined}>{analysis.private ? "Private" : analysis.private === false ? "Public" : analysis.repoUrl.includes("github.com") ? "GitHub" : "Git"}</span>
+              <span className="label label-muted">{analysis.repoUrl.includes("github.com") ? "GitHub" : "Git"}</span>
               <span className="ml-auto flex items-center gap-2">
                 <button onClick={copyShare} className="btn btn-sm"><Octicon name="share" className="h-3.5 w-3.5" />{copied ? "Copied" : "Share"}</button>
                 <button onClick={downloadCodeowners} disabled={departed.size === 0} className="btn btn-sm" title="Proposes a still-here owner for every risky file"><Octicon name="download" className="h-3.5 w-3.5" />CODEOWNERS</button>
                 <a href={reportHref} target="_blank" className="btn btn-sm"><Octicon name="report" className="h-3.5 w-3.5" />Report</a>
-                <span className="text-[11px] text-fg-subtle" title={user ? "Your departed list, leaver and KT ticks are saved to your account" : "Sign in to keep your scenario across devices"}>
-                  {user ? (saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved to your account" : saveState === "error" ? "Not saved" : saveState === "loading" ? "Loading your scenario…" : "") : "Sign in to save"}
-                </span>
                 <button onClick={() => setTourOpen(true)} className="btn btn-sm btn-invisible" title="Guided tour">Tour</button>
-                <button onClick={() => analyze(true)} disabled={loading} className="btn btn-sm btn-invisible" title="Fetch latest changes and re-analyse"><Octicon name="history" className="h-3.5 w-3.5" /></button>
+                <button onClick={() => analyze(true)} disabled={loading} className="btn btn-sm btn-invisible" title="Re-clone and re-analyse"><Octicon name="history" className="h-3.5 w-3.5" /></button>
               </span>
             </div>
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-fg-muted sm:text-[13px]">
@@ -362,12 +308,18 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
         {error && (
           <div className="mb-4 flex items-start gap-2 rounded-md border border-danger/40 bg-danger-muted px-3 py-2 text-[13px] text-fg">
             <Octicon name="flame" className="mt-0.5 h-4 w-4 text-danger" />
-            <span className="flex-1">{error}</span>
-            {!user && /sign in/i.test(error) && <a href="/api/auth/login" className="btn btn-sm btn-primary">Sign in with GitHub</a>}
+            <span>{error}</span>
           </div>
         )}
         {loading && progress && (
-          <MascotLoader compact title="Casper is exploring this repository" progress={progress} />
+          <div className="mb-4 rounded-md border border-border bg-canvas-subtle px-3 py-2 text-[13px]">
+            <div className="flex items-center gap-2">
+              <span className="ghost-pulse inline-block h-2 w-2 rounded-full bg-success" />
+              <span>{progress.step}</span>
+              {progress.total ? <span className="counter">{progress.done} / {progress.total}</span> : null}
+            </div>
+            {progress.total ? <div className="progress mt-2 w-80"><span style={{ width: `${((progress.done ?? 0) / progress.total) * 100}%` }} /></div> : null}
+          </div>
         )}
 
         {!analysis && !loading && (
@@ -480,8 +432,6 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
               </Card>
               </div>
 
-              <CommitActivity key={analysis.repoUrl} analysis={analysis} departed={departed} />
-
               <PrCheck repoUrl={analysis.repoUrl} analysis={analysis} scored={scored} departed={departed} onSelect={(p) => { setSelected(p); setBrief(null); setBriefError(null); }} />
 
               {mode === "layoffs" && departed.size > 0 && (
@@ -496,7 +446,7 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
             {/* Side panel */}
             <aside className="min-w-0" data-tour="panel">
               {!selectedFile && mode === "notice" && departed.size > 0 && (
-                <HandoverPanel analysis={analysis} repoUrl={repoUrl} email={[...departed][0]} lastDay={lastDay} extraDeparted={new Set()} onSelect={(p) => setSelected(p)} done={kt} onToggleDone={(p) => setKt((s) => { const n = new Set(s); if (n.has(p)) n.delete(p); else n.add(p); return n; })} />
+                <HandoverPanel analysis={analysis} repoUrl={repoUrl} email={[...departed][0]} lastDay={lastDay} extraDeparted={new Set()} onSelect={(p) => setSelected(p)} />
               )}
               {!selectedFile && mode === "notice" && departed.size === 0 && (
                 <Card title="Handover plan">
@@ -587,7 +537,7 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
       </main>
 
       {analysis && (
-        <RepositoryAssistantContext
+        <Assistant
           repoUrl={analysis.repoUrl}
           context={{
             mode,
