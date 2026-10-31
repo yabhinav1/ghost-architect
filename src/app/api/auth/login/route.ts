@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
+import { getAppConfig } from "@/lib/app-config";
 import { randomState, sessionCookieOptions, STATE_COOKIE } from "@/lib/session";
 
 export async function GET(request: Request) {
-  const clientId = process.env.GITHUB_CLIENT_ID;
-  if (!clientId) {
-    return NextResponse.redirect(new URL("/?error=" + encodeURIComponent("GITHUB_CLIENT_ID is not set. Create an OAuth app and add it to .env.local."), request.url));
-  }
+  const cfg = getAppConfig();
+  // First run on a fresh machine: create the GitHub App with one click, then come back here.
+  if (!cfg) return NextResponse.redirect(new URL("/setup", request.url));
   const origin = new URL(request.url).origin;
   const state = randomState();
   const params = new URLSearchParams({
-    client_id: clientId,
+    client_id: cfg.clientId,
     redirect_uri: `${origin}/api/auth/callback`,
     scope: "repo read:user",
     state,

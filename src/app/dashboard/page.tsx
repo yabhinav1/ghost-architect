@@ -7,6 +7,7 @@ import { Octicon } from "@/components/ui";
 import { UserMenu } from "@/components/UserMenu";
 import Loading from "./loading";
 import { relativeTime } from "@/lib/format";
+import { getAppConfig } from "@/lib/app-config";
 import { listRepos, recentAnalyses } from "@/lib/github";
 import { getSession } from "@/lib/session";
 
@@ -15,7 +16,11 @@ export const metadata = { title: "Your repositories · Ghost-Architect" };
 async function DashboardBody() {
   const session = await getSession();
   if (!session) redirect("/");
-  const [repos, recent] = await Promise.all([listRepos(session.token), recentAnalyses()]);
+  const [listing, recent] = await Promise.all([listRepos(session.token), recentAnalyses()]);
+  const repos = listing.repos;
+  const cfg = getAppConfig();
+  const installUrl = cfg?.kind === "github-app" && cfg.slug ? `https://github.com/apps/${cfg.slug}/installations/new` : null;
+  const needsInstall = Boolean(installUrl) && listing.installations === 0;
   const user = { login: session.login, name: session.name, avatar: session.avatar };
   const privateCount = repos.filter((r) => r.private).length;
   const languages = Object.entries(
@@ -84,6 +89,17 @@ async function DashboardBody() {
         </aside>
 
         <section className="min-w-0">
+          {installUrl && (
+            <div className={`mb-4 flex flex-wrap items-center gap-3 rounded-md border px-3 py-2 text-[13px] ${needsInstall ? "border-attention/40 bg-attention-muted" : "border-border bg-canvas-subtle"}`}>
+              <Octicon name="repo" className={`h-4 w-4 ${needsInstall ? "text-attention" : "text-fg-muted"}`} />
+              <span className="flex-1">
+                {needsInstall
+                  ? "Private repositories show up once Ghost-Architect is installed on them. Takes one click, pick \u201cAll repositories\u201d."
+                  : `Installed on ${listing.installations} account${listing.installations > 1 ? "s" : ""}. Add more repositories any time.`}
+              </span>
+              <a href={installUrl} className={`btn btn-sm ${needsInstall ? "btn-primary" : ""}`}>{needsInstall ? "Install on my repositories" : "Manage access"}</a>
+            </div>
+          )}
           <RepoList repos={repos} />
         </section>
       </main>

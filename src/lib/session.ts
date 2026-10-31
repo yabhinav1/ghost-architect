@@ -2,7 +2,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
 import { cookies } from "next/headers";
 import type { SessionUser } from "./types";
 
-export type Session = SessionUser & { token: string };
+export type Session = SessionUser & { token: string; expiresAt?: number };
 
 export const SESSION_COOKIE = "gh_session";
 export const STATE_COOKIE = "gh_oauth_state";
@@ -43,7 +43,9 @@ export async function getSession(): Promise<Session | null> {
   const raw = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!raw) return null;
   const s = unseal<Session>(raw);
-  return s && s.token && s.login ? s : null;
+  if (!s || !s.token || !s.login) return null;
+  if (s.expiresAt && Date.now() > s.expiresAt) return null; // GitHub App user tokens expire; sign in again (one click)
+  return s;
 }
 
 /** Safe-to-ship-to-the-client view of the session. */

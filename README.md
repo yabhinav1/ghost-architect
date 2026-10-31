@@ -22,9 +22,13 @@ Optional: set `GITHUB_TOKEN` so PR lookups get 5000 requests/hour instead of 60.
 
 ## Sign in with GitHub
 
-Create an OAuth App at https://github.com/settings/developers with callback `http://localhost:3000/api/auth/callback`, put the Client ID and Secret in `.env.local`, and the landing page gets a **Continue with GitHub** button. The dashboard then lists every repository you can see, private ones included, with search, filters, and one-click Analyse. Private repos are cloned with your token for that request only; the token lives in an encrypted, httpOnly cookie and is never written to disk.
+Click **Sign in with GitHub** on the landing page. The first time on a machine it goes to `/setup`, where one click creates a GitHub App called Ghost-Architect on your account (GitHub prefills everything from a manifest) and sends you straight into the login. The credentials land in `.cache/github-app.json` and `.env.local`. After that, every user signs in with their normal GitHub account and lands on the dashboard.
 
-Routes: `/` landing, `/dashboard` your repos, `/r/owner/name` analysis, `/analyse` any public repo without signing in.
+The dashboard lists every repository you can see. Private ones appear once the app is installed on them, which is the "Install on my repositories" button at the top of the dashboard, one click, pick "All repositories". Private repos are cloned with your token for that request only; the token lives in an encrypted, httpOnly cookie and is never written to disk.
+
+If you already have an OAuth App, set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` in `.env.local` instead and `/setup` is skipped.
+
+Routes: `/` landing, `/setup` one-time app creation, `/dashboard` your repos, `/r/owner/name` analysis, `/analyse` any public repo without signing in.
 
 ## Two modes
 
