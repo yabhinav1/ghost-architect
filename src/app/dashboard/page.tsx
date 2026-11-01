@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Mark } from "@/components/Mascot";
 import { Portfolio } from "@/components/Portfolio";
 import { RepoList } from "@/components/RepoList";
+import { RepoSearch } from "@/components/RepoSearch";
 import { Octicon } from "@/components/ui";
 import { UserMenu } from "@/components/UserMenu";
 import { InboxBox } from "@/components/InboxFeed";
@@ -12,16 +13,23 @@ import { relativeTime } from "@/lib/format";
 import { getAppConfig } from "@/lib/app-config";
 import { listRepos } from "@/lib/github";
 import { recentForUser } from "@/lib/userdata";
+import { handoversFor, inboxOf } from "@/lib/org";
 import { isAdmin } from "@/lib/roles";
 import { getSession } from "@/lib/session";
+import type { Repo } from "@/lib/types";
 
 export const metadata = { title: "Your repositories · Ghost-Architect" };
 
 async function DashboardBody() {
   const session = await getSession();
   if (!session) redirect("/");
-  const [listing, recent] = await Promise.all([session.token ? listRepos(session.token) : Promise.resolve({ repos: [], installations: 0 }), recentForUser(session.login)]);
+  const [listing, recent, inbox, myHandovers] = await Promise.all([session.token ? listRepos(session.token) : Promise.resolve({ repos: [] as Repo[], installations: 0, fetchedAt: new Date().toISOString() }), recentForUser(session.login), inboxOf(session.login), handoversFor(session.login)]);
+  const unread = inbox.filter((n) => n.status === "sent").length;
+  const openHandovers = myHandovers.filter((h) => h.status === "open");
+
   const repos = listing.repos;
+  const staleBefore = new Date(listing.fetchedAt ?? new Date().toISOString()).getTime() - 6 * 30.44 * 86400000; // server component: computed per request
+  const stale = repos.filter((r) => !r.fork && !r.archived && Date.parse(r.pushed_at) < staleBefore).length;
   const cfg = getAppConfig();
   const installUrl = cfg?.kind === "github-app" && cfg.slug ? `https://github.com/apps/${cfg.slug}/installations/new` : null;
   const needsInstall = Boolean(installUrl) && listing.installations === 0;
@@ -39,7 +47,7 @@ async function DashboardBody() {
           <nav className="ml-4 hidden items-center gap-1 text-[13px] sm:flex">
             <Link href="/dashboard" className="rounded-md px-2 py-1 font-semibold">My repositories</Link>
             <Link href="/org" className="rounded-md px-2 py-1 text-fg-muted hover:text-fg">Organisations</Link>
-            <Link href="/me" className="rounded-md px-2 py-1 text-fg-muted hover:text-fg">Inbox</Link>
+            <Link href="/me" className="rounded-md px-2 py-1 text-fg-muted hover:text-fg">Inbox{unread ? <span className="counter ml-1">{unread}</span> : null}</Link>
             <Link href="/analyse" className="rounded-md px-2 py-1 text-fg-muted hover:text-fg">Analyse any repo</Link>
             {isAdmin(session.login) && <Link href="/admin" className="rounded-md px-2 py-1 text-fg-muted hover:text-fg">Admin</Link>}
           </nav>
@@ -48,8 +56,8 @@ async function DashboardBody() {
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-[1200px] gap-5 px-4 py-5 lg:grid-cols-[280px_1fr]">
-        <aside className="stagger space-y-4">
+      <main className="mx-auto grid max-w-[1200px] gap-5 px-4 py-5 lg:grid-cols-[280px_1fr] lg:items-start">
+        <aside className="stagger space-y-4 lg:sticky lg:top-[57px] lg:max-h-[calc(100vh-57px-1.25rem)] lg:overflow-hidden">
           <InboxBox />
           <div className="card p-4">
             <div className="flex items-center gap-3">
@@ -108,6 +116,13 @@ async function DashboardBody() {
               <a href={installUrl} className={`btn btn-sm ${needsInstall ? "btn-primary" : ""}`}>{needsInstall ? "Install on my repositories" : "Manage access"}</a>
             </div>
           )}
+          <section className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+            <Link href="/me" className="card p-3 hover:border-fg-subtle"><p className="text-[11px] text-fg-muted">Unread notices</p><p className={`text-2xl font-semibold ${unread ? "text-accent" : ""}`}>{unread}</p></Link>
+            <Link href="/me" className="card p-3 hover:border-fg-subtle"><p className="text-[11px] text-fg-muted">Open handovers</p><p className={`text-2xl font-semibold ${openHandovers.length ? "text-attention" : ""}`}>{openHandovers.length}</p>{openHandovers[0]?.dueDate && <p className="text-[10px] text-fg-subtle">next due {openHandovers.map((h) => h.dueDate).filter(Boolean).sort()[0]}</p>}</Link>
+            <div className="card p-3"><p className="text-[11px] text-fg-muted">Private / public</p><p className="text-2xl font-semibold">{privateCount} <span className="text-fg-muted">/ {repos.length - privateCount}</span></p></div>
+            <div className="card p-3"><p className="text-[11px] text-fg-muted">Stale (6+ months)</p><p className={`text-2xl font-semibold ${stale ? "text-attention" : ""}`}>{stale}</p></div>
+          </section>
+          <div className="mb-4"><RepoSearch repos={repos} /></div>
           <Portfolio repos={repos.filter((r) => r.owner.login === user.login)} />
           <RepoList repos={repos} />
         </section>

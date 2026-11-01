@@ -15,7 +15,7 @@ export function ghHeaders(token?: string): Record<string, string> {
   return h;
 }
 
-export type RepoListing = { repos: Repo[]; installations: number };
+export type RepoListing = { repos: Repo[]; installations: number; fetchedAt?: string };
 
 async function pageAll<T>(url: string, token: string, pick: (j: unknown) => T[], maxPages = 4): Promise<T[]> {
   const out: T[] = [];
@@ -52,7 +52,7 @@ export async function listRepos(token: string): Promise<RepoListing> {
   }
 
   const repos = [...byId.values()].sort((a, b) => b.pushed_at.localeCompare(a.pushed_at));
-  const listing = { repos, installations };
+  const listing = { repos, installations, fetchedAt: new Date().toISOString() };
   listingCache.set(k, { at: Date.now(), listing });
   return listing;
 }

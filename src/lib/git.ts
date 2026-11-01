@@ -309,6 +309,11 @@ export async function analyzeRepo(repoUrl: string, force = false, onProgress?: O
   }
 
   const dir = await ensureClone(url, onProgress, token, force);
+  try {
+    await git(dir, ["rev-parse", "--verify", "HEAD"]);
+  } catch {
+    throw new Error("This repository has no commits yet, so there is no history to analyse. Push a commit and try again.");
+  }
   onProgress?.({ step: "Listing files" });
   const all = (await git(dir, ["ls-files"])).split("\n").filter(Boolean);
   const code = all.filter(isCodeFile);
