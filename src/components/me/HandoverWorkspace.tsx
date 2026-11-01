@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { PendingWork } from "@/components/PendingWork";
 import type { Handover } from "@/lib/types";
 
 type Item = Handover & { orgName: string; orgSlug: string; mine: "leaver" | "receiver" };
@@ -69,6 +70,7 @@ export function HandoverWorkspace({ handover }: { handover: Item }) {
         ))}
         {files.length === 0 && <li className="px-4 py-4 text-[13px] text-fg-muted">No files listed. Add the ones that matter below, or ask a manager to analyse the repository first.</li>}
       </ul>
+      <PendingWork slug={handover.orgSlug} login={handover.leaverLogin} repoUrl={handover.repoUrl} files={files} />
       <div className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3">
         <input value={addPath} onChange={(e) => setAddPath(e.target.value)} className="input w-72 font-mono text-[12px]" placeholder="add a file path, e.g. src/billing/retry.ts" />
         <button onClick={() => { if (addPath.trim()) { patch({ addFile: addPath.trim() }); setAddPath(""); } }} disabled={saving || !addPath.trim()} className="btn btn-sm">Add file</button>

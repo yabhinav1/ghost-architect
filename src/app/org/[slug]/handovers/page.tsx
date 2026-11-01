@@ -2,6 +2,7 @@ import { MascotLoader } from "@/components/MascotLoader";
 import Link from "next/link";
 import { Suspense } from "react";
 import { HandoverCreator } from "@/components/org/forms";
+import { PendingWork } from "@/components/PendingWork";
 import { OrgShell } from "@/components/org/OrgShell";
 import { handoversOf, reposOf } from "@/lib/org";
 import { canManage, membersOf } from "@/lib/roles";
@@ -45,6 +46,7 @@ async function Body({ params }: { params: Params }) {
                   <span className={`ml-auto label ${h.status === "complete" ? "label-success" : pct > 0 ? "label-accent" : "label-attention"}`}>{h.status === "complete" ? "complete" : `${done}/${h.files.length} files`}</span>
                 </div>
                 <div className="progress mt-2"><span style={{ width: `${pct}%` }} /></div>
+                <div className="mt-2 rounded-md border border-border-muted"><PendingWork slug={access.org.slug} login={h.leaverLogin} repoUrl={h.repoUrl} files={h.files} /></div>
               </li>
             );
           })}
