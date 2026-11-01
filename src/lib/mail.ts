@@ -12,7 +12,8 @@ export type MailResult = { sent: boolean; via: "smtp" | "outbox"; error?: string
 
 export function mailConfig() {
   const user = process.env.SMTP_USER?.trim();
-  const pass = process.env.SMTP_PASS?.trim();
+  // Google shows app passwords as four groups with spaces; people paste them that way.
+  const pass = process.env.SMTP_PASS?.replace(/\s+/g, "");
   const host = process.env.SMTP_HOST?.trim() || "smtp.gmail.com";
   const port = Number(process.env.SMTP_PORT || 465);
   const from = process.env.MAIL_FROM?.trim() || (user ? `Ghost-Architect <${user}>` : "");
@@ -33,8 +34,23 @@ let transport: nodemailer.Transporter | null = null;
 function smtp() {
   const c = mailConfig();
   if (!c.configured) return null;
-  transport ??= nodemailer.createTransport({ host: c.host, port: c.port, secure: c.port === 465, auth: { user: c.user, pass: c.pass } });
+  transport ??= nodemailer.createTransport({ host: c.host, port: c.port, secure: c.port === 465, auth: { user: c.user, pass: c.pass }, connectionTimeout: 15_000, greetingTimeout: 15_000, socketTimeout: 30_000 });
   return transport;
+}
+
+let verified: { at: number; ok: boolean; error?: string } | null = null;
+/** Logs in to the SMTP server without sending anything. Cached for five minutes. */
+export async function verifySmtp(): Promise<{ ok: boolean; error?: string }> {
+  const t = smtp();
+  if (!t) return { ok: false, error: "SMTP not configured" };
+  if (verified && Date.now() - verified.at < 300_000) return verified;
+  try {
+    await t.verify();
+    verified = { at: Date.now(), ok: true };
+  } catch (e) {
+    verified = { at: Date.now(), ok: false, error: (e as Error).message };
+  }
+  return verified;
 }
 
 export async function sendMail(m: Mail): Promise<MailResult> {

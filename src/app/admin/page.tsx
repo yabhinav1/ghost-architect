@@ -10,6 +10,8 @@ import { InboxBox } from "@/components/InboxFeed";
 import { list } from "@/lib/db";
 import { cacheDir } from "@/lib/git";
 import { laneSummary } from "@/lib/llm";
+import { mailConfig, verifySmtp } from "@/lib/mail";
+import { MailTest } from "@/components/admin/MailTest";
 import { isAdmin } from "@/lib/roles";
 import { getSession } from "@/lib/session";
 import { storeEnabled } from "@/lib/store";
@@ -38,6 +40,8 @@ async function Body() {
     // none
   }
   const lanes = laneSummary();
+  const mail = mailConfig();
+  const mailStatus = mail.configured ? ((await verifySmtp()).ok ? "smtp" : "smtp-failing") : "outbox";
   const platformAudit = audit.filter((a) => a.orgId === null || a.action.startsWith("org.supportAccess") || a.action === "org.create").sort((a, b) => b.at.localeCompare(a.at)).slice(0, 60);
   return (
     <div className="min-h-screen">
@@ -86,6 +90,7 @@ async function Body() {
               <div className="card-header">Platform health</div>
               <ul className="divide-y divide-border-muted text-[12px]">
                 <li className="flex items-center justify-between px-4 py-2"><span>Health check</span><a href="/api/health" className="text-accent hover:underline">/api/health</a></li>
+                <MailTest status={mailStatus} defaultTo={mail.user ?? ""} />
                 <li className="flex items-center justify-between px-4 py-2"><span>Durable store</span><span className={`label ${storeEnabled ? "label-success" : "label-attention"}`}>{storeEnabled ? "on" : "off (disk only)"}</span></li>
                 <li className="px-4 py-2"><p>Model lanes</p><ul className="mt-1 space-y-0.5 font-mono text-[11px] text-fg-muted">{lanes.map((l) => <li key={l.id}>{l.model}{l.coolingFor ? ` · cooling ${l.coolingFor}s` : " · ready"}</li>)}{lanes.length === 0 && <li>no LLM configured</li>}</ul></li>
               </ul>

@@ -1,7 +1,7 @@
 import { getAppConfig, validateClientPair } from "@/lib/app-config";
 import { looksLikeGithubToken, serverGithubToken } from "@/lib/env";
 import { llmConfig } from "@/lib/llm";
-import { mailConfig } from "@/lib/mail";
+import { mailConfig, verifySmtp } from "@/lib/mail";
 import { storeEnabled } from "@/lib/store";
 
 /**
@@ -52,7 +52,10 @@ export async function GET() {
   if (!llm.apiKey) out.ok = false;
   out.durableStore = storeEnabled ? "on" : "off";
   const mail = mailConfig();
-  out.mail = { status: mail.configured ? "smtp" : "outbox", host: mail.configured ? mail.host : undefined, from: mail.configured ? mail.from : undefined, hint: mail.configured ? undefined : "Set SMTP_USER and SMTP_PASS (Gmail: an app password) to deliver notices and handoffs by email; until then they are written to .cache/outbox and delivered in-app only." };
+  if (mail.configured) {
+    const v = await verifySmtp();
+    out.mail = { status: v.ok ? "smtp" : "smtp-failing", host: mail.host, port: mail.port, from: mail.from, error: v.error, hint: v.ok ? undefined : /auth|credentials|535/i.test(v.error ?? "") ? "Gmail rejected the login. Use a 16-character app password (not the account password) from myaccount.google.com/apppasswords, with SMTP_USER set to the same Gmail address." : "The SMTP server could not be reached from this host. Try SMTP_PORT=587." };
+  } else out.mail = { status: "outbox", hint: "Set SMTP_USER and SMTP_PASS (Gmail: an app password) to deliver notices and handoffs by email; until then they are written to .cache/outbox and delivered in-app only." };
   out.appUrl = process.env.APP_URL ?? null;
 
   return Response.json(out, { status: out.ok ? 200 : 503, headers: { "Cache-Control": "no-store" } });
