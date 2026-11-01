@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import { del, get, list, newId, put } from "./db.ts";
 import { cacheDir, normalizeRepoUrl, repoKey } from "./git.ts";
 import { portfolioSummary, type PortfolioSummary } from "./insights.ts";
+import { renderEmail } from "./email-template.ts";
 import { appUrl, deliverable, sendMail } from "./mail.ts";
 import { audit, membersOf } from "./roles.ts";
 import { storeGet } from "./store.ts";
@@ -128,7 +129,19 @@ export async function sendNotice(org: Org, by: string, input: { toLogin: string;
   await audit(org.id, by, "notice.send", n.toLogin, { type: n.type, id: n.id });
   const to = await get<Member>("members", `${org.id}:${n.toLogin}`);
   if (deliverable(to?.email)) {
-    void sendMail({ to: to.email, subject: `[${org.name}] ${n.subject}`, text: `${n.body}\n\nRead and acknowledge it here: ${appUrl()}/me\nPrintable letter: ${appUrl()}/letter/${n.id}` });
+    const label = NOTICE_TEMPLATES[n.type]?.label ?? "Notice";
+    const email = renderEmail({
+      appUrl: appUrl(),
+      preheader: n.body.slice(0, 120),
+      kicker: org.name,
+      heading: n.subject,
+      meta: `${label} · from @${by} · ${n.createdAt.slice(0, 10)}`,
+      blocks: [{ kind: "quote", text: n.body }, ...(n.handoverId ? [{ kind: "callout" as const, tone: "info" as const, text: "A handover workspace is attached: the files, your notes and the knowledge check live on your inbox page." }] : [])],
+      cta: { label: "Read and acknowledge", url: `${appUrl()}/me` },
+      secondary: [{ label: "Printable letter", url: `${appUrl()}/letter/${n.id}` }, ...(n.handoverId ? [{ label: "Open the handover", url: `${appUrl()}/me#handover-${n.handoverId}` }] : [])],
+      reason: `You are receiving this because you are a member of ${org.name} on Ghost-Architect.`,
+    });
+    void sendMail({ to: to.email, subject: `[${org.name}] ${n.subject}`, ...email });
   }
   return n;
 }

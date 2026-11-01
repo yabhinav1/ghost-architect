@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { get, list, newId, put, update } from "./db.ts";
 import { normalizeRepoUrl } from "./git.ts";
+import { renderEmail } from "./email-template.ts";
 import { appUrl, sendMail } from "./mail.ts";
 import { membership, canManage } from "./roles.ts";
 import { seal, unseal } from "./session-crypto.ts";
@@ -89,12 +90,29 @@ export async function createTransfer(actor: Actor, raw: unknown): Promise<WorkTr
     // The grant runs when the recipient accepts, when the sender is not around: keep their token sealed until then.
     sealedGrant: wantsGrant ? seal({ token: actor.token, login: actor.login.toLowerCase(), at: now }) : undefined,
   });
-  const grantLine = input.ownership ? "On accepting, repository ownership on GitHub will be transferred to you (GitHub will email you to confirm)." : input.access !== "none" ? `On accepting, you will be added as a collaborator with ${input.access === "admin" ? "admin" : "write"} access.` : "";
-  void sendMail({
-    to: input.recipientEmail,
-    subject: `@${actor.login} is handing work over to you: ${input.title}`,
-    text: `${actor.login} is handing over unfinished work on ${url}${input.branch ? ` (${input.branch})` : ""}.\n\n${input.notes.slice(0, 1500)}\n\n${grantLine ? grantLine + "\n\n" : ""}Sign in with the GitHub account that owns ${input.recipientEmail} to accept or decline: ${appUrl()}/me#transfer-${t.id}`,
+  const repoName = url.slice("https://github.com/".length);
+  const grant = input.ownership
+    ? { kind: "callout" as const, tone: "warning" as const, text: `When you accept, ${actor.login} transfers ownership of ${repoName} to you on GitHub. GitHub will email you a confirmation; the repository moves once you accept it there.` }
+    : input.access !== "none"
+      ? { kind: "callout" as const, tone: "info" as const, text: `When you accept, you are added to ${repoName} as a collaborator with ${input.access === "admin" ? "admin" : "write"} access.` }
+      : null;
+  const email = renderEmail({
+    appUrl: appUrl(),
+    preheader: input.notes.slice(0, 120),
+    kicker: repoName,
+    heading: input.title,
+    meta: `Work handoff from @${actor.login}${org ? ` · ${org.name}` : ""} · ${now.slice(0, 10)}`,
+    blocks: [
+      { kind: "facts", rows: [{ label: "Repository", value: repoName, href: url }, ...(input.branch ? [{ label: "Branch / PR", value: input.branch }] : []), { label: "From", value: `@${actor.login}`, href: `https://github.com/${actor.login}` }, { label: "Sent to", value: input.recipientEmail }] },
+      { kind: "quote", label: "Handoff notes", text: input.notes.slice(0, 4000) },
+      ...(grant ? [grant] : []),
+      { kind: "paragraph", text: `Sign in with the GitHub account that has ${input.recipientEmail} as a verified email to accept or decline.` },
+    ],
+    cta: { label: "Review the handoff", url: `${appUrl()}/me#transfer-${t.id}` },
+    secondary: [{ label: "Open the repository", url }],
+    reason: `You are receiving this because @${actor.login} addressed a work handoff to ${input.recipientEmail}.`,
   });
+  void sendMail({ to: input.recipientEmail, subject: `[${repoName}] Work handoff from @${actor.login}: ${input.title}`, ...email });
   return t;
 }
 
