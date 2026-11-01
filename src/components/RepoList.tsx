@@ -8,6 +8,14 @@ import { Octicon } from "@/components/ui";
 import type { Repo } from "@/lib/types";
 
 type Sort = "pushed" | "name" | "stars";
+
+/** Repositories are shown in visibility sections so private and public work never mix on screen. */
+const GROUPS: { key: string; title: string; hint: string; labelClass: string; pick: (r: Repo) => boolean }[] = [
+  { key: "private", title: "Private", hint: "only accounts with access can analyse these; never shared", labelClass: "label-attention", pick: (r) => r.private && !r.archived },
+  { key: "public", title: "Public", hint: "anyone can analyse these", labelClass: "label-success", pick: (r) => !r.private && !r.fork && !r.archived },
+  { key: "forks", title: "Forks", hint: "copies of other people's repositories", labelClass: "label-muted", pick: (r) => !r.private && r.fork && !r.archived },
+  { key: "archived", title: "Archived", hint: "read-only on GitHub", labelClass: "label-muted", pick: (r) => r.archived },
+];
 type Filter = "all" | "private" | "public" | "sources" | "forks";
 
 export function RepoList({ repos }: { repos: Repo[] }) {
@@ -66,36 +74,46 @@ export function RepoList({ repos }: { repos: Repo[] }) {
       </div>
       <p className="mt-2 text-[12px] text-fg-muted"><b className="text-fg">{shown.length}</b> of {repos.length} repositories</p>
 
-      <ul className="stagger mt-2 divide-y divide-border-muted border-t border-border-muted">
-        {shown.map((r) => (
-          <li key={r.id} className="flex items-start gap-4 py-4 transition-colors hover:bg-canvas-subtle/40">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <Link href={`/r/${r.full_name}`} prefetch className="truncate text-[16px] font-semibold text-accent hover:underline" onClick={(e) => { e.preventDefault(); go(r); }}>
-                  {r.owner.login !== r.full_name.split("/")[0] ? r.full_name : r.name}
-                </Link>
-                <span className="label label-muted">{r.private ? "Private" : "Public"}</span>
-                {r.fork && <span className="label label-muted">Fork</span>}
-                {r.archived && <span className="label label-attention">Archived</span>}
-              </div>
-              {r.description && <p className="mt-1 line-clamp-2 text-[13px] text-fg-muted">{r.description}</p>}
-              <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-fg-muted">
-                {r.language && <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-full" style={{ background: LANGUAGE_COLORS[r.language] ?? "#8b949e" }} />{r.language}</span>}
-                {r.stargazers_count > 0 && <span>★ {r.stargazers_count}</span>}
-                {r.forks_count > 0 && <span>⑂ {r.forks_count}</span>}
-                <span>Updated {relativeTime(r.pushed_at)}</span>
-              </p>
+      {GROUPS.map((g) => {
+        const items = shown.filter(g.pick);
+        if (!items.length) return null;
+        return (
+          <section key={g.key} className="card mt-3">
+            <div className="card-header">
+              <span className={`label ${g.labelClass}`}>{g.title}</span>
+              <span className="counter">{items.length}</span>
+              <span className="ml-2 text-[12px] font-normal text-fg-muted">{g.hint}</span>
             </div>
-            <button onClick={() => go(r)} disabled={pending && goingTo === r.full_name} className="btn btn-sm shrink-0 self-center">
-              <Octicon name="ghost" className="h-3.5 w-3.5" />
-              {pending && goingTo === r.full_name ? "Opening…" : "Analyse"}
-            </button>
-          </li>
-        ))}
-        {shown.length === 0 && (
-          <li className="blankslate"><h3>No repositories match</h3><p>Try a different search or filter.</p></li>
-        )}
-      </ul>
+            <ul className="stagger divide-y divide-border-muted">
+              {items.map((r) => (
+                <li key={r.id} className="flex items-start gap-4 px-4 py-3 transition-colors hover:bg-canvas-subtle/40">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link href={`/r/${r.full_name}`} prefetch className="truncate text-[15px] font-semibold text-accent hover:underline" onClick={(e) => { e.preventDefault(); go(r); }}>
+                        {r.owner.login !== r.full_name.split("/")[0] ? r.full_name : r.name}
+                      </Link>
+                      {r.fork && <span className="label label-muted">Fork</span>}
+                      {r.archived && <span className="label label-attention">Archived</span>}
+                    </div>
+                    {r.description && <p className="mt-0.5 line-clamp-1 text-[13px] text-fg-muted">{r.description}</p>}
+                    <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-fg-muted">
+                      {r.language && <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-full" style={{ background: LANGUAGE_COLORS[r.language] ?? "#8b949e" }} />{r.language}</span>}
+                      {r.stargazers_count > 0 && <span>★ {r.stargazers_count}</span>}
+                      {r.forks_count > 0 && <span>⑂ {r.forks_count}</span>}
+                      <span>Updated {relativeTime(r.pushed_at)}</span>
+                    </p>
+                  </div>
+                  <button onClick={() => go(r)} disabled={pending && goingTo === r.full_name} className="btn btn-sm shrink-0 self-center">
+                    <Octicon name="ghost" className="h-3.5 w-3.5" />
+                    {pending && goingTo === r.full_name ? "Opening…" : "Analyse"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        );
+      })}
+      {shown.length === 0 && <div className="card mt-3"><div className="blankslate"><h3>No repositories match</h3><p>Try a different search or filter.</p></div></div>}
     </div>
   );
 }

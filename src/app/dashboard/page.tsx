@@ -57,7 +57,7 @@ async function DashboardBody() {
       </header>
 
       <main className="mx-auto grid max-w-[1200px] gap-5 px-4 py-5 lg:grid-cols-[280px_1fr] lg:items-start">
-        <aside className="stagger space-y-4 lg:sticky lg:top-[57px] lg:max-h-[calc(100vh-57px-1.25rem)] lg:overflow-hidden">
+        <aside className="stagger space-y-3 lg:sticky lg:top-[57px] lg:max-h-[calc(100vh-57px-1.25rem)] lg:overflow-hidden">
           <InboxBox />
           <div className="card p-4">
             <div className="flex items-center gap-3">
@@ -77,7 +77,7 @@ async function DashboardBody() {
               <div className="mt-4">
                 <p className="mb-1.5 text-[11px] font-semibold text-fg-muted">Languages</p>
                 <ul className="space-y-1 text-[12px]">
-                  {languages.map(([lang, n]) => (
+                  {languages.slice(0, 4).map(([lang, n]) => (
                     <li key={lang} className="flex items-center justify-between"><span>{lang}</span><span className="counter">{n}</span></li>
                   ))}
                 </ul>
@@ -91,7 +91,7 @@ async function DashboardBody() {
               <p className="px-4 py-4 text-[12px] text-fg-muted">Nothing yet. Pick a repository and hit Analyse. Your history is private to your account.</p>
             ) : (
               <ul className="divide-y divide-border-muted">
-                {recent.map((r) => (
+                {recent.slice(0, 3).map((r) => (
                   <li key={r.repoUrl}>
                     <Link href={`/r/${r.slug}`} className="block px-4 py-2 hover:bg-canvas-subtle">
                       <p className="truncate font-mono text-[12px] text-accent">{r.slug}</p>
