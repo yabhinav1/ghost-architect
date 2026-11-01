@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { scoreColor } from "@/lib/score";
 import type { Scored } from "@/lib/types";
 
-type Node = { name: string; path?: string; value?: number; score?: number; children?: Node[] };
+export type Node = { name: string; path?: string; value?: number; score?: number; children?: Node[] };
 
 function buildTree(files: Scored[]): Node {
   const root: Node = { name: "repo", children: [] };
@@ -20,6 +20,15 @@ function buildTree(files: Scored[]): Node {
     group.children!.push({ name: parts.slice(1).join("/") || f.path, path: f.path, value: Math.max(f.lines, 8), score: f.score });
   }
   return root;
+}
+
+export function layoutFiles(files: Scored[], w: number, h: number) {
+  const root = hierarchy(buildTree(files)).sum((d) => d.value ?? 0);
+  treemap<Node>().size([w, h]).paddingOuter(3).paddingTop(18).paddingInner(2).tile(treemapSquarify)(root);
+  return {
+    groups: (root.children ?? []) as HierarchyRectangularNode<Node>[],
+    leaves: root.leaves() as HierarchyRectangularNode<Node>[],
+  };
 }
 
 export function Treemap({ files, selected, onSelect }: { files: Scored[]; selected: string | null; onSelect: (path: string) => void }) {
@@ -37,15 +46,11 @@ export function Treemap({ files, selected, onSelect }: { files: Scored[]; select
     return () => ro.disconnect();
   }, []);
 
-  const leaves = useMemo(() => {
-    const root = hierarchy(buildTree(files)).sum((d) => d.value ?? 0);
-    treemap<Node>().size([size.w, size.h]).paddingOuter(3).paddingTop(18).paddingInner(2).tile(treemapSquarify)(root);
-    return { groups: root.children ?? [], leaves: root.leaves() as HierarchyRectangularNode<Node>[] };
-  }, [files, size]);
+  const leaves = useMemo(() => layoutFiles(files, size.w, size.h), [files, size]);
 
   return (
     <div ref={ref} className="relative w-full overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950" style={{ height: size.h }}>
-      {(leaves.groups as HierarchyRectangularNode<Node>[]).map((g) => (
+      {leaves.groups.map((g) => (
         <div
           key={g.data.name}
           className="absolute truncate px-1 text-[10px] uppercase tracking-wide text-zinc-500"
