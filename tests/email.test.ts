@@ -26,5 +26,5 @@ test("renderEmail escapes content, links the CTA and produces a text twin", () =
   assert.ok(html.includes("#fff8c5"), "warning callout tone");
   assert.ok(text.includes("> Run the tests"), "text twin quotes notes");
   assert.ok(text.includes("Review: https://ghost.test/me#transfer-1"), "text twin has cta");
-  assert.ok(!/<[a-z]/i.test(text), "text twin has no html");
+  assert.ok(!/<(a|table|p|div)[ >]/i.test(text) && text.includes("Finish <billing> migration"), "text twin keeps the author's text and has no markup");
 });
