@@ -40,7 +40,7 @@ async function Body() {
         </div>
       </header>
       <main className="mx-auto grid max-w-[1100px] gap-4 px-4 py-6 lg:grid-cols-[1fr_1.4fr] lg:items-start">
-        <div className="space-y-4 lg:sticky lg:top-[57px] lg:max-h-[calc(100vh-57px-1.5rem)] lg:overflow-y-auto lg:pr-1 thin-scroll">
+        <div className="space-y-4">
           <TransferComposer organisations={orgs.filter(({ member }) => member.status !== "left").map(({ org }) => ({ id: org.id, name: org.name }))} />
           <section className="card">
             <div className="card-header"><Octicon name="report" className="h-4 w-4 text-fg-muted" />Inbox {unread > 0 && <span className="counter ml-1">{unread} new</span>}</div>

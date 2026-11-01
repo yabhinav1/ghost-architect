@@ -10,6 +10,7 @@ export function TransferComposer({ organisations }: { organisations: { id: strin
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
   const [orgId, setOrgId] = useState("");
+  const [open, setOpen] = useState(false);
   async function send(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -23,13 +24,15 @@ export function TransferComposer({ organisations }: { organisations: { id: strin
       }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Could not send handoff.");
-      form.reset(); setOrgId(""); setSent(true); refresh();
+      form.reset(); setOrgId(""); setSent(true); setOpen(false); refresh();
     } catch (e) { setError(e instanceof Error ? e.message : "Could not send handoff."); }
     finally { setBusy(false); }
   }
   return <section id="send-work" className="card scroll-mt-20">
-    <div className="card-header">Transfer unfinished work</div>
-    <form className="space-y-3 p-4 text-sm" onSubmit={send}>
+    <div className="card-header">Transfer unfinished work<button type="button" onClick={() => setOpen((o) => !o)} className={`btn btn-sm ml-auto ${open ? "" : "btn-primary"}`} aria-expanded={open}>{open ? "Close" : "New handoff"}</button></div>
+    {!open && sent && <p role="status" className="px-4 pt-3 text-[13px] text-success">Handoff sent. It is emailed to the recipient and waits in their inbox here. Track it under Sent.</p>}
+    {!open && <p className="px-4 py-3 text-[13px] text-fg-muted">Send repository details, progress and next steps to a developer or an organisation. Optionally add them as a collaborator or transfer the repository on GitHub when they accept.</p>}
+    {open && <form className="space-y-3 p-4 text-sm" onSubmit={send}>
       <p className="text-fg-muted">Send repository details, progress and next steps to a developer or an organisation representative.</p>
       <label className="block">Send to<select className="input mt-1 w-full" value={orgId} onChange={(event) => setOrgId(event.target.value)} disabled={busy}><option value="">A developer</option>{organisations.map((org) => <option key={org.id} value={org.id}>{org.name} · owner or manager</option>)}</select></label>
       <label className="block">{orgId ? "Organisation owner or manager’s email" : "Recipient’s email"}<input className="input mt-1 w-full" name="recipientEmail" type="email" maxLength={254} placeholder="teammate@company.com" required disabled={busy} /></label>
@@ -46,8 +49,8 @@ export function TransferComposer({ organisations }: { organisations: { id: strin
       </fieldset>
       {error && <p role="alert" className="text-danger">{error}</p>}
       {sent && <p role="status" className="text-success">Handoff saved. It will appear in the recipient’s inbox when they sign in with the matching verified GitHub email. Track it below.</p>}
-      <button className="btn btn-primary" disabled={busy}>{busy ? "Sending…" : "Send work handoff"}</button>
-    </form>
+      <div className="sticky bottom-0 -mx-4 -mb-4 flex items-center gap-3 border-t border-border bg-canvas px-4 py-3"><button className="btn btn-primary" disabled={busy}>{busy ? "Sending…" : "Send work handoff"}</button><button type="button" className="btn" onClick={() => setOpen(false)} disabled={busy}>Cancel</button></div>
+    </form>}
   </section>;
 }
 
