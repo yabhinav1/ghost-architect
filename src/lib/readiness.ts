@@ -15,7 +15,8 @@ export type PendingWork = {
 };
 
 /** 0..100: how safely this person can leave, from the handover and their pending work. */
-export function readiness(files: { done: boolean; notes: string }[], pending: PendingWork | null): { score: number; label: "not ready" | "in progress" | "nearly" | "ready"; reasons: string[] } {
+/** quiz: undefined when no knowledge check exists; otherwise whether the receiver has passed it. */
+export function readiness(files: { done: boolean; notes: string }[], pending: PendingWork | null, quiz?: "passed" | "not passed"): { score: number; label: "not ready" | "in progress" | "nearly" | "ready"; reasons: string[] } {
   const reasons: string[] = [];
   const n = files.length || 1;
   const doneShare = files.filter((f) => f.done).length / n;
@@ -35,6 +36,10 @@ export function readiness(files: { done: boolean; notes: string }[], pending: Pe
     if (pending.branches.length) reasons.push(`${pending.branches.length} branch${pending.branches.length > 1 ? "es" : ""} with unmerged work`);
     if (pending.todos.length) reasons.push(`${pending.todos.length} TODO/FIXME they wrote`);
   }
+  if (quiz === "not passed") {
+    score = Math.max(0, score - 15);
+    reasons.push("knowledge check not passed");
+  } else if (quiz === "passed") score += 5;
   const label = score >= 85 ? "ready" : score >= 60 ? "nearly" : score >= 25 ? "in progress" : "not ready";
   return { score: Math.min(100, score), label, reasons };
 }

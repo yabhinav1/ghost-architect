@@ -3,16 +3,22 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { KtQuiz, type ClientQuiz } from "@/components/me/KtQuiz";
 import { PendingWork } from "@/components/PendingWork";
 import type { Handover } from "@/lib/types";
 
-type Item = Handover & { orgName: string; orgSlug: string; mine: "leaver" | "receiver" };
+function quizState(quiz: ClientQuiz | undefined, receiver: string): "passed" | "not passed" | undefined {
+  if (!quiz) return undefined;
+  return quiz.attempts.some((a) => a.by === receiver && a.score / a.total >= 0.8) ? "passed" : "not passed";
+}
+
+type Item = Omit<Handover, "quiz"> & { quiz?: ClientQuiz; orgName: string; orgSlug: string; mine: "leaver" | "receiver" };
 
 /**
  * The leaver fills in notes and links per file and ticks it off; the receiver reads them and can also tick.
  * Everything saves on blur, so a walkthrough can happen with both people editing live.
  */
-export function HandoverWorkspace({ handover }: { handover: Item }) {
+export function HandoverWorkspace({ handover, meLogin }: { handover: Item; meLogin: string }) {
   const router = useRouter();
   const [files, setFiles] = useState(handover.files);
   const [addPath, setAddPath] = useState("");
@@ -70,7 +76,8 @@ export function HandoverWorkspace({ handover }: { handover: Item }) {
         ))}
         {files.length === 0 && <li className="px-4 py-4 text-[13px] text-fg-muted">No files listed. Add the ones that matter below, or ask a manager to analyse the repository first.</li>}
       </ul>
-      <PendingWork slug={handover.orgSlug} login={handover.leaverLogin} repoUrl={handover.repoUrl} files={files} />
+      <PendingWork slug={handover.orgSlug} login={handover.leaverLogin} repoUrl={handover.repoUrl} files={files} quiz={quizState(handover.quiz, handover.receiverLogin)} />
+      <KtQuiz handoverId={handover.id} quiz={handover.quiz ?? null} mine={handover.mine} receiverLogin={handover.receiverLogin} meLogin={meLogin} />
       <div className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3">
         <input value={addPath} onChange={(e) => setAddPath(e.target.value)} className="input w-72 font-mono text-[12px]" placeholder="add a file path, e.g. src/billing/retry.ts" />
         <button onClick={() => { if (addPath.trim()) { patch({ addFile: addPath.trim() }); setAddPath(""); } }} disabled={saving || !addPath.trim()} className="btn btn-sm">Add file</button>
@@ -80,6 +87,7 @@ export function HandoverWorkspace({ handover }: { handover: Item }) {
         ) : (
           <button onClick={() => patch({ status: "open" })} disabled={saving} className="btn btn-sm">Reopen</button>
         )}
+        <Link href={`/packet/${handover.id}`} className="btn btn-sm" title="Everything the receiver needs on day one, printable">Day-one packet</Link>
         <a href={`/r/${slug}`} className="btn btn-sm">Open repository</a>
         {saving && <span className="text-[11px] text-fg-muted">saving…</span>}
         {error && <span className="text-[11px] text-danger">{error}</span>}

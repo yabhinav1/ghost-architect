@@ -4,7 +4,7 @@ import { useState } from "react";
 import { readiness, type PendingWork as Pending } from "@/lib/readiness";
 
 /** What still dies with this person in this repo, plus a readiness score for the handover. */
-export function PendingWork({ slug, login, repoUrl, files }: { slug: string; login: string; repoUrl: string; files: { done: boolean; notes: string }[] }) {
+export function PendingWork({ slug, login, repoUrl, files, quiz }: { slug: string; login: string; repoUrl: string; files: { done: boolean; notes: string }[]; quiz?: "passed" | "not passed" }) {
   const [data, setData] = useState<Pending | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -17,7 +17,7 @@ export function PendingWork({ slug, login, repoUrl, files }: { slug: string; log
       .catch((e) => setError((e as Error).message))
       .finally(() => setLoading(false));
   }
-  const r = readiness(files, data);
+  const r = readiness(files, data, quiz);
   const tone = r.label === "ready" ? "label-success" : r.label === "nearly" ? "label-accent" : r.label === "in progress" ? "label-attention" : "label-danger";
   const total = data ? data.pullRequests.length + data.issues.length + data.branches.length + data.todos.length : null;
   return (

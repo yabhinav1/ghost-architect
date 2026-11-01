@@ -207,6 +207,8 @@ export type Handover = {
   createdBy: string;
   createdAt: string;
   completedAt?: string;
+  /** knowledge check the receiver takes, generated from briefs and the leaver's notes */
+  quiz?: Quiz;
 };
 
 export type AuditEntry = {
@@ -247,3 +249,7 @@ export type InboxSummary = {
   transfers: (WorkTransfer & { incoming: boolean })[];
   emailWarning?: string;
 };
+
+export type QuizQuestion = { id: string; file: string; question: string; choices: string[]; answer: number; explanation: string };
+export type QuizAttempt = { by: string; score: number; total: number; at: string; answers: number[] };
+export type Quiz = { questions: QuizQuestion[]; generatedAt: string; generatedBy: string; attempts: QuizAttempt[] };

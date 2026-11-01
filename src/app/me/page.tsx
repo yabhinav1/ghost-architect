@@ -3,7 +3,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Mark } from "@/components/Mascot";
+import { Countdown } from "@/components/Countdown";
 import { HandoverWorkspace } from "@/components/me/HandoverWorkspace";
+import { stripQuiz } from "@/lib/quiz-client";
 import { Inbox } from "@/components/me/Inbox";
 import { TransferComposer, WorkTransfers } from "@/components/me/WorkTransfers";
 import { Octicon } from "@/components/ui";
@@ -21,6 +23,7 @@ async function Body() {
   const [notices, handovers, orgs] = await Promise.all([inboxOf(session.login), handoversFor(session.login), orgsOf(session.login)]);
   const unread = notices.filter((n) => n.status === "sent").length;
   const open = handovers.filter((h) => h.status === "open");
+  const leaving = orgs.filter(({ member }) => member.status === "leaving" || member.lastDay);
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-30 border-b border-border bg-canvas-inset/95 backdrop-blur">
@@ -52,9 +55,15 @@ async function Body() {
           </section>
         </div>
         <div className="space-y-4">
+          {leaving.length > 0 && (
+            <section className="card">
+              <div className="card-header"><Octicon name="clock" className="h-4 w-4 text-fg-muted" />Your countdown</div>
+              {leaving.map(({ org, member }) => <Countdown key={org.id} name="You" lastDay={member.lastDay} handovers={handovers.filter((h) => h.orgId === org.id && h.leaverLogin === session.login.toLowerCase())} />)}
+            </section>
+          )}
           <WorkTransfers />
           <h2 className="text-[13px] font-semibold uppercase tracking-wide text-fg-muted">Handovers {open.length > 0 && <span className="counter ml-1">{open.length} open</span>}</h2>
-          {handovers.map((h) => <HandoverWorkspace key={h.id} handover={h} />)}
+          {handovers.map((h) => <HandoverWorkspace key={h.id} handover={stripQuiz(h)} meLogin={session.login.toLowerCase()} />)}
           {handovers.length === 0 && <section className="card"><div className="blankslate !py-8"><h3>No handovers</h3><p>When a manager assigns you one, as the person leaving or the one receiving, it appears here with the files, notes and links.</p></div></section>}
         </div>
       </main>
