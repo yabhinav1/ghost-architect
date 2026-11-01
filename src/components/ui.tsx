@@ -24,8 +24,8 @@ export function Avatar({ name, email, size = 20, gone = false }: { name: string;
         height: size,
         fontSize: Math.max(9, Math.round(size * 0.42)),
         background: gone ? "rgba(110,118,129,0.25)" : `hsl(${h} 45% 30%)`,
-        color: gone ? "#8b949e" : `hsl(${h} 80% 85%)`,
-        border: gone ? "1px dashed #6e7681" : "1px solid rgba(240,246,252,0.1)",
+        color: gone ? "var(--color-fg-muted)" : `hsl(${h} 80% 88%)`,
+        border: gone ? "1px dashed var(--color-fg-subtle)" : "1px solid var(--color-btn-primary-border)",
         textDecoration: gone ? "line-through" : undefined,
       }}
     >

@@ -3,11 +3,11 @@ export function ReadinessRing({ score, label, size = 96, light = false }: { scor
   const r = (size - 10) / 2;
   const c = 2 * Math.PI * r;
   const tone = label === "ready" ? "#1a7f37" : label === "nearly" ? "#0969da" : label === "in progress" ? "#9a6700" : "#cf222e";
-  const toneDark = label === "ready" ? "#3fb950" : label === "nearly" ? "#58a6ff" : label === "in progress" ? "#d29922" : "#f85149";
-  const stroke = light ? tone : toneDark;
-  const track = light ? "#eaeef2" : "#30363d";
-  const ink = light ? "#1f2328" : "#e6edf3";
-  const muted = light ? "#59636e" : "#8b949e";
+  // `light` is the printable packet (fixed colours); otherwise follow the app theme through its tokens.
+  const stroke = light ? tone : label === "ready" ? "var(--color-success)" : label === "nearly" ? "var(--color-accent)" : label === "in progress" ? "var(--color-attention)" : "var(--color-danger)";
+  const track = light ? "#eaeef2" : "var(--color-border)";
+  const ink = light ? "#1f2328" : "var(--color-fg)";
+  const muted = light ? "#59636e" : "var(--color-fg-muted)";
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={`Readiness ${score} of 100, ${label}`}>
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={track} strokeWidth={8} />

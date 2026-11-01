@@ -74,7 +74,7 @@ export function PrCheck({ repoUrl, analysis, scored, departed, onSelect }: { rep
                 const receiver = s ? suggestReceiver(s, departed, analysis.authors) : null;
                 return (
                   <li key={r.path} className="flex items-center gap-2 py-1.5 text-[12px]">
-                    <span className="inline-block h-3 w-3 shrink-0 rounded-sm" style={{ background: s ? scoreColor(s.score) : "#21262d" }} />
+                    <span className="inline-block h-3 w-3 shrink-0 rounded-sm" style={{ background: s ? scoreColor(s.score) : "var(--color-border-muted)" }} />
                     {s ? (
                       <button onClick={() => onSelect(r.path)} className="truncate font-mono text-accent hover:underline">{r.path}</button>
                     ) : (

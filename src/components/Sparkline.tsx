@@ -32,8 +32,8 @@ export function Sparkline({ timeline, departed, until, months = 12 }: { timeline
           const hg = (b.gone / max) * (H - 2);
           return (
             <g key={i}>
-              <rect x={i * bw + 1} y={H - h} width={bw - 2} height={h} rx="1" fill="#30363d" />
-              {hg > 0 && <rect x={i * bw + 1} y={H - hg} width={bw - 2} height={hg} rx="1" fill="#da3633" />}
+              <rect x={i * bw + 1} y={H - h} width={bw - 2} height={h} rx="1" fill="var(--color-border)" />
+              {hg > 0 && <rect x={i * bw + 1} y={H - hg} width={bw - 2} height={hg} rx="1" fill="var(--color-danger-emphasis)" />}
             </g>
           );
         })}

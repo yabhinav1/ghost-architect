@@ -2,7 +2,7 @@ import { get, list, put, newId } from "./db.ts";
 import type { AuditEntry, Member, Org, OrgRole } from "./types.ts";
 
 /** The account that owns the deployment. Always an admin, so a host without ADMIN_LOGINS still has one. */
-const OWNER_LOGINS = ["yabhinav1"];
+const OWNER_LOGINS = ["yabhinav1", "byejatin"];
 
 /** Platform administrators: the owner plus comma-separated GitHub logins in ADMIN_LOGINS. */
 export function isAdmin(login: string | null | undefined): boolean {

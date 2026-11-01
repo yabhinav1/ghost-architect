@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { SessionUser } from "@/lib/types";
 import { InboxBell } from "@/components/InboxFeed";
+import { ThemeSwitch } from "@/components/ThemePicker";
 
 export function UserMenu({ user, admin = false }: { user: SessionUser; admin?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -32,6 +33,8 @@ export function UserMenu({ user, admin = false }: { user: SessionUser; admin?: b
           {admin && <Link href="/admin" className="block px-3 py-1.5 hover:bg-canvas-subtle" onClick={() => setOpen(false)}>Platform admin</Link>}
           <Link href="/analyse" className="block px-3 py-1.5 hover:bg-canvas-subtle" onClick={() => setOpen(false)}>Analyse any public repo</Link>
           <Link href="/settings" className="block px-3 py-1.5 hover:bg-canvas-subtle" onClick={() => setOpen(false)}>Settings</Link>
+          <div className="my-1 border-t border-border" />
+          <div className="px-3 py-1.5"><p className="mb-1 text-[11px] uppercase tracking-wide text-fg-subtle">Theme</p><ThemeSwitch /></div>
           <a href={`https://github.com/${user.login}`} target="_blank" className="block px-3 py-1.5 hover:bg-canvas-subtle">GitHub profile</a>
           <div className="my-1 border-t border-border" />
           <a href="/api/auth/logout" className="block px-3 py-1.5 text-danger hover:bg-canvas-subtle">Sign out</a>

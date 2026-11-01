@@ -79,6 +79,10 @@ Notices, letters, handover assignments and work handoffs are always delivered in
 
 When sending a handoff the sender chooses what happens on GitHub the moment the recipient accepts: nothing, add them as a collaborator with write or admin access, and optionally transfer ownership of a personally owned repository. The sender must be a repository admin at send time; their GitHub token is sealed with the server secret on the handoff record and used once, at acceptance, then dropped (also dropped on decline or cancel). Ownership transfer calls GitHub's repository transfer API: GitHub emails the new owner, who has one day to accept; the repository stays put until then. Organisation-owned repositories cannot be transferred this way. If a step fails, the sender gets a retry button that uses their live session.
 
+### Appearance
+
+Settings → Appearance offers Dark (default), Light and Sync with system, like GitHub. The choice is stored in the browser and applied before first paint, so there is no flash. Charts keep a dark plotting surface in both themes so the risk ramp reads the same.
+
 ## Accounts and access
 
 Ghost-Architect is multi-user. Each GitHub account gets:

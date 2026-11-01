@@ -37,7 +37,7 @@ export function OrgShell({ org, role, user, active, children }: { org: Org; role
           </div>
           <div className="underline-nav mt-3">
             {TABS.map((t) => (
-              <Link key={t.href} href={`/org/${org.slug}${t.href}`} className={`px-3 py-2 text-[14px] ${active === t.href ? "border-b-2 border-[#f78166] font-semibold text-fg" : "text-fg-muted hover:text-fg"}`}>{t.label}</Link>
+              <Link key={t.href} href={`/org/${org.slug}${t.href}`} className={`px-3 py-2 text-[14px] ${active === t.href ? "border-b-2 border-[var(--color-nav-active)] font-semibold text-fg" : "text-fg-muted hover:text-fg"}`}>{t.label}</Link>
             ))}
           </div>
         </div>

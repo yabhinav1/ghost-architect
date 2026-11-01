@@ -33,14 +33,14 @@ export function DecayChart({ files, email, name }: { files: FileStat[]; email: s
       <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 w-full">
         {[0, 0.5, 1].map((v) => (
           <g key={v}>
-            <line x1={pad.l} x2={W - pad.r} y1={y(v)} y2={y(v)} stroke="#30363d" />
-            <text x={pad.l - 4} y={y(v) + 3} textAnchor="end" fontSize="8" fill="#8b949e">{Math.round(v * 100)}%</text>
+            <line x1={pad.l} x2={W - pad.r} y1={y(v)} y2={y(v)} stroke="var(--color-border)" />
+            <text x={pad.l - 4} y={y(v) + 3} textAnchor="end" fontSize="8" fill="var(--color-fg-muted)">{Math.round(v * 100)}%</text>
           </g>
         ))}
-        <path d={path} fill="none" stroke={rotting ? "#f85149" : "#3fb950"} strokeWidth="1.5" />
-        {curve.points.map((p, i) => <circle key={i} cx={x(i)} cy={y(p.absorbed)} r="1.8" fill={rotting ? "#f85149" : "#3fb950"} />)}
-        <text x={pad.l} y={H - 5} fontSize="8" fill="#8b949e">0</text>
-        <text x={W - pad.r} y={H - 5} fontSize="8" fill="#8b949e" textAnchor="end">{n - 1} months after they left</text>
+        <path d={path} fill="none" stroke={rotting ? "var(--color-danger)" : "var(--color-success)"} strokeWidth="1.5" />
+        {curve.points.map((p, i) => <circle key={i} cx={x(i)} cy={y(p.absorbed)} r="1.8" fill={rotting ? "var(--color-danger)" : "var(--color-success)"} />)}
+        <text x={pad.l} y={H - 5} fontSize="8" fill="var(--color-fg-muted)">0</text>
+        <text x={W - pad.r} y={H - 5} fontSize="8" fill="var(--color-fg-muted)" textAnchor="end">{n - 1} months after they left</text>
       </svg>
       <p className="text-[10px] text-fg-subtle">Share of their files that someone else has since edited. Flat and low means the knowledge is rotting.</p>
     </div>

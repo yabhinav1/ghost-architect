@@ -49,7 +49,7 @@ export function Treemap({ files, selected, onSelect }: { files: Scored[]; select
   const leaves = useMemo(() => layoutFiles(files, size.w, size.h), [files, size]);
 
   return (
-    <div ref={ref} className="relative w-full overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950" style={{ height: size.h }}>
+    <div ref={ref} className="chart-surface relative w-full overflow-hidden rounded-lg border border-zinc-800" style={{ height: size.h }}>
       {leaves.groups.map((g) => (
         <div
           key={g.data.name}
