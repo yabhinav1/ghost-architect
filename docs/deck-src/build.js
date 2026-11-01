@@ -65,6 +65,30 @@ function iconCircle(slide, data, x, y, d = 0.5, bg = HEX.accent1) {
   slide.addImage({ data, x: x + d * 0.24, y: y + d * 0.24, w: d * 0.52, h: d * 0.52, objectName: "icon" });
 }
 
+function bullets(slide, items, x, y, w, h, size = 10.5, name = "bullets") {
+  slide.addText(items.map((t, i) => ({ text: t, options: { bullet: { indent: 10 }, breakLine: i < items.length - 1 } })), { x, y, w, h, fontSize: size, color: C.text2, margin: 0, isTextBox: true, paraSpaceAfter: 4, valign: "top", objectName: name });
+}
+function panel(slide, head, items, x, y, w, h, size = 10.5, name = "panel", headColor = C.text1) {
+  card(slide, x, y, w, h, `${name}-card`);
+  slide.addText(head, { x: x + 0.15, y: y + 0.1, w: w - 0.3, h: 0.32, fontSize: 12.5, bold: true, color: headColor, margin: 0, isTextBox: true, valign: "middle", objectName: `${name}-h` });
+  bullets(slide, items, x + 0.15, y + 0.48, w - 0.3, h - 0.58, size, `${name}-b`);
+}
+function box(slide, text, x, y, w, h, color = HEX.accent1, name = "box") {
+  slide.addShape(pres.ShapeType.roundRect, { x, y, w, h, fill: { color: color, transparency: 85 }, line: { color: color, width: 1 }, rectRadius: 0.08, objectName: `${name}-bg` });
+  slide.addText(text, { x: x + 0.05, y, w: w - 0.1, h, fontSize: 10.5, bold: true, color: C.text1, align: "center", valign: "middle", margin: 0, isTextBox: true, objectName: `${name}-t` });
+}
+function arrow(slide, x1, y1, x2, y2, name = "arrow") {
+  slide.addShape(pres.ShapeType.line, { x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1) || 0.01, h: Math.abs(y2 - y1) || 0.01, flipH: x2 < x1, flipV: y2 < y1, line: { color: HEX.dk2, width: 1.25, endArrowType: "triangle" }, objectName: name });
+}
+function smallMascot(slide, pose, say) {
+  mascot(slide, pose, 8.45, 3.95, 1.1, "mascot");
+  if (say) bubble(slide, say, 6.1, 4.2, 2.3, 0.6, "right");
+}
+/** Tiny Casper peeking in at the top-right corner of dense slides. */
+function cornerMascot(slide, pose) {
+  mascot(slide, pose, 8.95, 0.28, 0.72, "mascot");
+}
+
 function title(slide, text) {
   slide.addText(text, { placeholder: "title" });
 }
@@ -167,6 +191,41 @@ function title(slide, text) {
   mascot(s, "clipboard", 7.5, 2.6, 2.0);
   s.addNotes("The risk score needs no AI. The model only writes the briefs and quiz questions, from evidence we hand it.");
 
+
+  // ---------- architecture ----------
+  s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "System" });
+  title(s, "Architecture at a glance");
+  box(s, "Browser\nNext.js 16 app, React 19\nTailwind + Primer tokens", 0.5, 1.3, 2.0, 1.0, HEX.accent1, "a-browser");
+  box(s, "Next.js server\nApp Router route handlers\nSuspense + partial prefetch", 3.3, 1.3, 2.3, 1.0, HEX.accent5, "a-server");
+  box(s, "GitHub\nOAuth · REST API\ngit over HTTPS", 6.6, 0.95, 2.0, 0.75, HEX.dk2, "a-github");
+  box(s, "Groq (free tier)\nopenai/gpt-oss-120b + 20b", 6.6, 1.85, 2.0, 0.6, HEX.accent4, "a-llm");
+  box(s, "Brevo\nemail over HTTPS", 6.6, 2.6, 2.0, 0.55, HEX.accent2, "a-mail");
+  box(s, "Clone cache\n.cache/repos, size watchdog", 0.5, 3.1, 1.75, 0.8, HEX.accent6, "a-clones");
+  box(s, "Analysis + brief cache\nJSON per repo and file", 2.4, 3.1, 1.95, 0.8, HEX.accent6, "a-analysis");
+  box(s, "Document store\norgs · members · notices\nhandovers · transfers · audit", 4.5, 3.1, 2.0, 0.8, HEX.accent6, "a-db");
+  box(s, "Upstash Redis\noptional mirror, TLS", 4.5, 4.15, 2.0, 0.55, HEX.accent3, "a-redis");
+  arrow(s, 2.5, 1.8, 3.3, 1.8, "ar1"); arrow(s, 5.6, 1.6, 6.6, 1.3, "ar2"); arrow(s, 5.6, 1.85, 6.6, 2.1, "ar3"); arrow(s, 5.6, 2.1, 6.6, 2.85, "ar4");
+  arrow(s, 4.4, 2.3, 1.4, 3.1, "ar5"); arrow(s, 4.45, 2.3, 3.4, 3.1, "ar6"); arrow(s, 4.5, 2.3, 5.5, 3.1, "ar7"); arrow(s, 5.5, 3.9, 5.5, 4.15, "ar8");
+  s.addText([
+    { text: "Sessions: ", options: { bold: true, color: C.text1 } }, { text: "AES-256-GCM sealed httpOnly cookie carries the GitHub token; the server never stores it.", options: { breakLine: true } },
+    { text: "Per request: ", options: { bold: true, color: C.text1 } }, { text: "every repo endpoint re-checks the viewer's GitHub access before touching a clone.", options: { breakLine: true } },
+    { text: "Hosting: ", options: { bold: true, color: C.text1 } }, { text: "Render (Docker), self-warm on boot, keep-alive ping, /api/health self-check." },
+  ], { x: 0.5, y: 4.1, w: 3.9, h: 1.0, fontSize: 9.5, color: C.text2, margin: 0, isTextBox: true, paraSpaceAfter: 3, objectName: "arch-notes" });
+  mascot(s, "clipboard", 8.45, 3.95, 1.1, "mascot");
+  bubble(s, "One server, three caches, three outside services.", 6.75, 3.3, 2.7, 0.55, "right");
+  s.addNotes("Walk left to right: browser, server, external services; the bottom row is what we persist.");
+
+  // ---------- analysis pipeline ----------
+  s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "System" });
+  title(s, "Analysis pipeline, in detail");
+  panel(s, "1 · Clone and list", ["Shallow-safe clone to a per-repo cache key; watchdog aborts past 300 MB", "git ls-files, keep source extensions only; skip vendored, minified, lockfiles, generated dirs", "rev-parse HEAD guard: empty repos get a friendly error"], 0.5, 1.2, 2.9, 1.75, 9.5, "p1");
+  panel(s, "2 · Blame and history", ["git blame --line-porcelain streamed per file, bounded concurrency", "git log --since 4 years with numstat: per-file commits in 12 and 24 months, per-author commits, last touched, daily timeline", "Up to 400 recent commits kept for the activity feed"], 3.55, 1.2, 2.9, 1.75, 9.5, "p2");
+  panel(s, "3 · Imports and reach", ["Multi-language import resolver: JS/TS, Python, Go, Java, Rust, Ruby, PHP and more", "Resolves relative and aliased paths to real files", "Inbound count per file = how many others depend on it"], 6.6, 1.2, 2.9, 1.75, 9.5, "p3");
+  panel(s, "4 · Score", ["orphanShare = 0.6 × blame share + 0.4 × commit share by departed authors", "× log(1 + commits in 12 months) × (1 + inbound)", "Normalised 0–100, colour ramp grey → amber → red"], 0.5, 3.1, 2.9, 1.5, 9.5, "p4");
+  panel(s, "5 · Outputs", ["Treemap heatmap (PNG export), riskiest files, author list with who-left toggles", "Generated CODEOWNERS, printable report, share links, time-machine slider", "Decay chart: how fast orphaned lines get absorbed over months"], 3.55, 3.1, 2.9, 1.5, 9.5, "p5");
+  panel(s, "6 · Cache and warm", ["Analysis cached per repo; briefs per file; mirrored to Upstash when set", "Warm script pre-analyses demo repos on boot and on a schedule", "Vector search (TF-IDF) over a user's repos, public/private classes"], 6.6, 3.1, 2.9, 1.5, 9.5, "p6");
+  cornerMascot(s, "search");
+  s.addNotes("The whole pipeline is plain git plus arithmetic. No model involved until the briefs.");
   // ---------- 5. risk in numbers (native chart) ----------
   s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "System" });
   title(s, "The risk score, on a real repository");
@@ -198,6 +257,45 @@ function title(slide, text) {
   bubble(s, "Same repo, same answer, for everyone. No vibes.", 6.55, 4.6, 2.95, 0.5, "right");
   s.addNotes("The chart is real output: the two red files are where a new maintainer gets hurt first. The formula is deterministic and explainable.");
 
+
+  // ---------- explain engine ----------
+  s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "System" });
+  title(s, "Explain engine: briefs with evidence");
+  box(s, "File", 0.5, 1.35, 1.1, 0.55, HEX.accent1, "e1");
+  box(s, "Evidence\ncommits touching it,\nlinked pull requests", 1.95, 1.2, 1.9, 0.85, HEX.accent6, "e2");
+  box(s, "Prompt\ntrimmed to fit free-tier limits", 4.2, 1.2, 1.9, 0.85, HEX.accent5, "e3");
+  box(s, "JSON brief\nzod-validated,\ntolerant parser", 6.45, 1.2, 1.7, 0.85, HEX.accent2, "e4");
+  arrow(s, 1.6, 1.62, 1.95, 1.62, "ea1"); arrow(s, 3.85, 1.62, 4.2, 1.62, "ea2"); arrow(s, 6.1, 1.62, 6.45, 1.62, "ea3");
+  panel(s, "What a brief contains", ["Purpose: why the file exists, in two sentences", "Claims, each with evidence links and a status: documented (cites a commit or PR) or inferred", "Undocumented: what nobody wrote down", "Risks and a safe-change checklist", "Cached per file; regenerated on demand"], 0.5, 2.3, 2.9, 2.2, 9.5, "x1");
+  panel(s, "Model lanes and limits", ["OpenAI-compatible client; Groq by default, optional second provider", "Per-model lane scheduler spreads batch work across gpt-oss-120b and 20b", "429 handling reads the suggested wait and retries; prompts trimmed to 8k TPM", "Rate limits per IP, account and server-wide ceiling"], 3.55, 2.3, 2.9, 2.2, 9.5, "x2");
+  panel(s, "Casper, the assistant", ["Streams answers about the open file or page, with deep links", "Same evidence rules: says 'not documented' instead of inventing", "Knows the current page: repository, dashboard, organisation, inbox", "Also writes the knowledge check from the leaver's notes"], 6.6, 2.3, 2.9, 2.2, 9.5, "x3");
+  s.addText("Honest by design: documented vs inferred is shown in the UI; switch the model off and the radar, handovers and work-in-flight still work.", { x: 0.5, y: 4.65, w: 7.6, h: 0.4, fontSize: 10.5, italic: true, color: C.accent1, margin: 0, isTextBox: true, objectName: "explain-note" });
+  cornerMascot(s, "idea");
+  s.addNotes("The model only ever sees evidence we collected; it is told to label guesses.");
+
+  // ---------- organisation system ----------
+  s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "System" });
+  title(s, "Organisation layer: data model");
+  const ents = [
+    ["Org", "name, slug, supportAccess (NDA switch), createdBy", HEX.accent1],
+    ["Member", "login, name, git email, role owner/manager/member, status active/leaving/left, lastDay", HEX.accent1],
+    ["Invite", "single-use token, role bounded by inviter, optional login pin", HEX.accent6],
+    ["OrgRepo", "linked repository, analysed on demand, feeds activity and handovers", HEX.accent6],
+    ["Notice", "template type, subject, body, status sent/read/acknowledged, printable letter", HEX.accent4],
+    ["Handover", "leaver → receiver, repo, files[path, notes, links, done], dueDate, quiz + attempts", HEX.accent2],
+    ["WorkTransfer", "recipient email, notes, branch/PR, grant (access, ownership), sealed sender token", HEX.accent5],
+    ["Audit", "who did what to whom, with metadata, per org and platform", HEX.accent3],
+  ];
+  ents.forEach(([h, t, c], i) => {
+    const x = 0.5 + (i % 2) * 3.65, y = 1.2 + Math.floor(i / 2) * 0.92;
+    card(s, x, y, 3.5, 0.8, `ent-card-${i}`);
+    s.addShape(pres.ShapeType.roundRect, { x: x + 0.12, y: y + 0.12, w: 1.15, h: 0.3, fill: { color: c, transparency: 80 }, line: { color: c, width: 0.75 }, rectRadius: 0.06, objectName: `ent-tag-bg-${i}` });
+    s.addText(h, { x: x + 0.12, y: y + 0.12, w: 1.15, h: 0.3, fontSize: 10.5, bold: true, color: C.text1, align: "center", valign: "middle", margin: 0, isTextBox: true, fontFace: "Courier New", objectName: `ent-tag-${i}` });
+    s.addText(t, { x: x + 1.38, y: y + 0.08, w: 2.02, h: 0.66, fontSize: 9, color: C.text2, margin: 0, isTextBox: true, valign: "middle", objectName: `ent-t-${i}` });
+  });
+  panel(s, "How it is used", ["Activity log matches every commit to a member by git email; unmatched emails are listed for mapping", "Notices from templates (notice period, layoff, handover) with {name} {org} {lastDay} placeholders", "Managers see progress per handover; members see only their own", "Everything is a JSON document under .cache/db, mirrored to Upstash"], 7.75, 1.2, 1.75, 3.6, 8.5, "org-use");
+  cornerMascot(s, "clipboard");
+  s.addNotes("Eight record types. The audit log is the thing an auditor asks for first.");
   // ---------- 6. handover flow ----------
   pres.addSection({ title: "Workflow" });
   s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Workflow" });
@@ -223,6 +321,43 @@ function title(slide, text) {
   bubble(s, "Not 'document everything'. Just the ten files that matter.", 6.95, 3.75, 2.6, 0.95, "left");
   s.addNotes("Walk the six steps. Mention the one-attempt quiz: the leaver regenerates it for a retry, so it cannot be brute-forced.");
 
+
+  // ---------- handover intelligence ----------
+  s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Workflow" });
+  title(s, "Handover intelligence: what is computed");
+  panel(s, "Work in flight", ["Open pull requests the leaver authored (GitHub search API)", "Open issues assigned to them", "Branches only they pushed, with unmerged commit counts (for-each-ref + rev-list)", "TODO / FIXME / HACK they wrote, found with git grep and attributed by blame", "Cached ten minutes per person and repo"], 0.5, 1.2, 2.9, 2.3, 9.5, "hi1");
+  panel(s, "Readiness score 0–100", ["55 % share of files walked through", "25 % share of files with real notes", "+20 minus penalties for open PRs, issues, branches and TODOs", "Knowledge check: −15 until passed, +5 when passed", "Labels: not ready · in progress · nearly · ready"], 3.55, 1.2, 2.9, 2.3, 9.5, "hi2");
+  panel(s, "Knowledge check", ["Five multiple-choice questions written only from the leaver's notes and cached briefs", "Receiver needs 80 %; one scored attempt per generated quiz", "Answer keys never reach the browser; wrong answers get the explanation, not the key", "Attempts recorded and shown to managers; feeds readiness"], 6.6, 1.2, 2.9, 2.3, 9.5, "hi3");
+  panel(s, "Day-one packet", ["Who is leaving and when, readiness ring, first-week checklist", "Per file: why it exists, the leaver's notes, risks, before-you-change-it list, evidence commits, links", "Work in flight in four counted panels", "Printable page and Markdown download"], 0.5, 3.65, 4.4, 1.4, 9.5, "hi4");
+  panel(s, "Countdown", ["Monday-to-Sunday calendar from this week to the last day", "Due dates amber, completions green, last day red, overdue flagged", "Shown to the leaver on their inbox and to managers per leaver"], 5.05, 3.65, 4.45, 1.4, 9.5, "hi5");
+  cornerMascot(s, "clipboard");
+  s.addNotes("Everything on this slide is derived from git and GitHub, except the quiz questions.");
+
+  // ---------- permissions matrix ----------
+  s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Workflow" });
+  title(s, "Who can do what");
+  const H = { bold: true, color: HEX.dk1, fill: { color: HEX.lt2 }, fontSize: 10.5, border: { type: "solid", color: BORDER, pt: 0.75 }, align: "center" };
+  const Lc = { color: HEX.dk1, fontSize: 10, border: { type: "solid", color: BORDER, pt: 0.75 }, valign: "middle" };
+  const Y = { text: "yes", options: { color: HEX.accent2, bold: true, fontSize: 10, align: "center", border: { type: "solid", color: BORDER, pt: 0.75 }, valign: "middle" } };
+  const N = { text: "no", options: { color: HEX.dk2, fontSize: 10, align: "center", border: { type: "solid", color: BORDER, pt: 0.75 }, valign: "middle" } };
+  const P = (t) => ({ text: t, options: { color: HEX.accent4, fontSize: 9.5, align: "center", border: { type: "solid", color: BORDER, pt: 0.75 }, valign: "middle" } });
+  const mrows = [
+    [{ text: "Action", options: H }, { text: "Anyone", options: H }, { text: "User", options: H }, { text: "Member", options: H }, { text: "Manager / Owner", options: H }, { text: "Admin", options: H }],
+    [{ text: "Analyse a public repository", options: Lc }, Y, Y, Y, Y, Y],
+    [{ text: "Analyse a private repository", options: Lc }, N, P("own access"), P("own access"), P("own access"), P("own access")],
+    [{ text: "See an organisation's members, repos, activity", options: Lc }, N, N, Y, Y, P("support access")],
+    [{ text: "Invite members, set leaving status and last day", options: Lc }, N, N, N, Y, N],
+    [{ text: "Send notices and letters, assign handovers", options: Lc }, N, N, N, Y, N],
+    [{ text: "Edit an owner's role or status", options: Lc }, N, N, N, P("owner only"), N],
+    [{ text: "Write notes, tick files, take the knowledge check", options: Lc }, N, N, P("own handover"), Y, N],
+    [{ text: "Generate the knowledge check", options: Lc }, N, N, P("leaver"), Y, N],
+    [{ text: "Send a work handoff with GitHub access changes", options: Lc }, N, P("repo admin"), P("repo admin"), P("repo admin"), P("repo admin")],
+    [{ text: "Platform health, metrics, platform audit", options: Lc }, N, N, N, N, Y],
+  ];
+  s.addTable(mrows, { x: 0.5, y: 1.15, w: 9.0, colW: [3.1, 1.0, 1.2, 1.2, 1.4, 1.1], rowH: 0.33, fontFace: "Calibri", margin: 0.04, objectName: "perm-table" });
+  s.addText("Every row is enforced on the server per request, never only in the UI. Admin support access is switched on by the organisation owner and every admin action inside is audited.", { x: 0.5, y: 4.85, w: 9.0, h: 0.35, fontSize: 9.5, italic: true, color: C.text2, margin: 0, isTextBox: true, objectName: "perm-note" });
+  cornerMascot(s, "shield");
+  s.addNotes("Point at the 'own access' cells: private repos are always gated by the viewer's own GitHub token.");
   // ---------- 7. roles and security ----------
   s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Workflow" });
   title(s, "Three roles, one rule: see only what GitHub lets you see");
@@ -253,6 +388,42 @@ function title(slide, text) {
   bubble(s, "If our store leaked: names and notes. No passwords, no tokens.", 6.95, 3.55, 2.6, 0.95, "left");
   s.addNotes("Say the review out loud: it found real issues and we fixed them the same day. That beats 'we think it is secure'.");
 
+
+  // ---------- security design ----------
+  s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Workflow" });
+  title(s, "Security design");
+  panel(s, "Identity and sessions", ["GitHub OAuth web flow with random state cookie; GitHub App manifest one-click setup as fallback", "Session = AES-256-GCM sealed httpOnly, Secure, SameSite=Lax cookie; token never stored server-side", "No passwords exist; dev login only when NODE_ENV≠production and DEV_LOGIN=1, with no GitHub token"], 0.5, 1.2, 4.4, 1.75, 9.5, "sd1");
+  panel(s, "Repository access", ["authorizeRepo on every endpoint: GitHub visibility with the viewer's token, cached; anonymous git ls-remote probe as fallback", "Repo URLs canonicalised to https://github.com/owner/repo, nothing else", "Files read via git show HEAD:<path> after path validation: no traversal, no symlink escape", "Clone credentials passed per command, never written to .git/config; isolated from host keychains"], 5.05, 1.2, 4.45, 1.75, 9.5, "sd2");
+  panel(s, "Abuse and tenancy", ["Rate limits per IP, per account and global on analysis, model calls, quiz, pending work, mail", "Random 72-bit ids; every id route re-checks ownership or membership", "Only owners edit owners; admins enter an org only with audited support access", "Prototype-safe maps, zod-validated payloads, length caps everywhere"], 0.5, 3.1, 4.4, 1.9, 9.5, "sd3");
+  panel(s, "Delegated GitHub actions and operator controls", ["Handoff grants seal the sender's token with AUTH_SECRET; used once on accept, dropped on decline/cancel, expire after 7 days; refused without AUTH_SECRET in production", "Emails escape all user text and never auto-link it; outbox fallback on disk", "/setup cannot replace configured credentials without SETUP_TOKEN; /api/health reports status, never values", "Independent adversarial review on 1 Nov: 3 high + 5 medium found, all fixed and verified"], 5.05, 3.1, 4.45, 1.9, 9.5, "sd4");
+  cornerMascot(s, "shield");
+  s.addNotes("This is the slide for the 'what if your database leaks' question: names and notes, no passwords, no tokens.");
+
+  // ---------- email and github actions ----------
+  s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Workflow" });
+  title(s, "Email delivery and GitHub actions");
+  panel(s, "Email", ["Brevo over HTTPS (Render's free plan blocks SMTP ports); SMTP with a Gmail app password elsewhere", "GitHub-notification style template: logo, card, facts table, quoted notes, callouts, green call to action, plain-text twin", "Sent for notices and letters, handover assignments, work handoffs, admin test", "No provider configured: messages land in .cache/outbox so demos still show them", "Health check logs in to the provider; admin page has a one-click test send"], 0.5, 1.2, 4.4, 2.6, 9.5, "em1");
+  panel(s, "Work handoffs that change GitHub", ["Sender chooses at send time: nothing, collaborator with write, collaborator with admin, and optionally transfer ownership", "Requires repo admin at send time; organisation-owned repos cannot be transferred with a personal token", "On accept: PUT /repos/{owner}/{repo}/collaborators/{user}, then POST /repos/{owner}/{repo}/transfer", "GitHub emails the new owner; the move completes when they accept within a day", "Failures leave the sender a retry button with their live session"], 5.05, 1.2, 4.45, 2.6, 9.5, "em2");
+  box(s, "Send", 0.5, 4.1, 1.2, 0.5, HEX.accent1, "f1"); box(s, "Recipient signs in\nverified email", 2.0, 4.1, 1.9, 0.5, HEX.accent6, "f2"); box(s, "Accept", 4.2, 4.1, 1.2, 0.5, HEX.accent2, "f3"); box(s, "Collaborator added", 5.7, 4.1, 1.7, 0.5, HEX.accent4, "f4"); box(s, "Ownership requested", 7.7, 4.1, 1.8, 0.5, HEX.accent3, "f5");
+  arrow(s, 1.7, 4.35, 2.0, 4.35, "fa1"); arrow(s, 3.9, 4.35, 4.2, 4.35, "fa2"); arrow(s, 5.4, 4.35, 5.7, 4.35, "fa3"); arrow(s, 7.4, 4.35, 7.7, 4.35, "fa4");
+  cornerMascot(s, "wave");
+  s.addNotes("The handoff flow calls the same GitHub APIs a manager would click through, at the moment of acceptance, from a record of what was handed over.");
+
+  // ---------- deployment and quality ----------
+  s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Workflow" });
+  title(s, "Deployment, operations and quality");
+  panel(s, "Deployment", ["Render web service from a Dockerfile; render.yaml declares every env var", "Self-warm on boot: demo repositories analysed before the first visitor", "Keep-alive ping so the free instance stays awake", "Upstash Redis mirror (optional) keeps analyses, briefs and records across redeploys"], 0.5, 1.2, 2.9, 2.2, 9.5, "dq1");
+  panel(s, "Operations", ["/api/health validates the OAuth pair against GitHub, checks the server token quota, the model config and the mail provider login", "scripts/doctor and scripts/warm for local and remote checks", "Mail log line per message; audit log per organisation action", "Developer sign-in presets (alice, bob, carol) for demos without GitHub"], 3.55, 1.2, 2.9, 2.2, 9.5, "dq2");
+  panel(s, "Quality", ["TypeScript strict, ESLint with React compiler rules", "64 automated tests: scoring, access rules, import resolver, path safety, rate limits, organisations, quiz grading, dates, packet, email template", "Independent security review, findings fixed same day", "Light and dark themes with Primer tokens; printable packet and letters"], 6.6, 1.2, 2.9, 2.2, 9.5, "dq3");
+  const chips2 = ["Next.js 16", "React 19", "TypeScript", "Tailwind v4", "zod", "nodemailer", "Groq", "GitHub API", "Render", "Docker", "Upstash", "Brevo"];
+  chips2.forEach((t, i) => {
+    const x = 0.5 + (i % 6) * 1.52, y = 3.6 + Math.floor(i / 6) * 0.5;
+    s.addShape(pres.ShapeType.roundRect, { x, y, w: 1.42, h: 0.4, fill: { color: C.background2 }, line: { color: BORDER, width: 1 }, rectRadius: 0.2, objectName: `chip2-${i}` });
+    s.addText(t, { x, y, w: 1.42, h: 0.4, fontSize: 10.5, color: C.text1, align: "center", valign: "middle", margin: 0, isTextBox: true, objectName: `chip2-t-${i}` });
+  });
+  s.addText("Everything above runs on free tiers. Total monthly cost today: $0.", { x: 0.5, y: 4.7, w: 7.0, h: 0.35, fontSize: 11, italic: true, color: C.accent2, margin: 0, isTextBox: true, objectName: "dq-note" });
+  cornerMascot(s, "party");
+  s.addNotes("Free to run is a feature: a company can self-host in an afternoon.");
   // ---------- 8. why different ----------
   pres.addSection({ title: "Why us" });
   s = pres.addSlide({ masterName: "CONTENT", sectionTitle: "Why us" });
