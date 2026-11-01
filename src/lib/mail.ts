@@ -38,6 +38,12 @@ function smtp() {
 }
 
 export async function sendMail(m: Mail): Promise<MailResult> {
+  const r = await deliver(m);
+  console.log(`[mail] ${m.to} "${m.subject.slice(0, 60)}" -> ${r.sent ? "sent" : r.via}${r.error ? ` (${r.error})` : ""}`);
+  return r;
+}
+
+async function deliver(m: Mail): Promise<MailResult> {
   if (!deliverable(m.to)) return { sent: false, via: "outbox", error: "no deliverable address" };
   const c = mailConfig();
   const t = smtp();
@@ -54,7 +60,9 @@ export async function sendMail(m: Mail): Promise<MailResult> {
     const dir = path.join(process.cwd(), ".cache", "outbox");
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(path.join(dir, `${Date.now()}-${m.to.replace(/[^\w.@-]/g, "_")}.json`), JSON.stringify({ ...m, at: new Date().toISOString() }, null, 2));
-  } catch { /* outbox is a courtesy */ }
+  } catch (e) {
+    return { sent: false, via: "outbox", error: `outbox write failed: ${(e as Error).message}` };
+  }
   return { sent: false, via: "outbox", error: "SMTP not configured" };
 }
 
