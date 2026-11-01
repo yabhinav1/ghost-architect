@@ -90,7 +90,7 @@ export async function activityFeed(org: Org, limit = 300): Promise<{ events: Act
     for (const c of a.commits ?? []) {
       const member = byEmail.get(c.email) ?? null;
       if (!member) {
-        const u = (unmatched[c.email] ??= { name: c.name, commits: 0 });
+        const u = Object.prototype.hasOwnProperty.call(unmatched, c.email) ? unmatched[c.email] : (unmatched[c.email] = { name: c.name, commits: 0 });
         u.commits++;
       }
       events.push({ date: c.date, repoUrl: a.repoUrl, slug, sha: c.sha, subject: c.subject, files: c.files, email: c.email, name: c.name, member });
@@ -136,7 +136,7 @@ export async function sendNotice(org: Org, by: string, input: { toLogin: string;
       kicker: org.name,
       heading: n.subject,
       meta: `${label} · from @${by} · ${n.createdAt.slice(0, 10)}`,
-      blocks: [{ kind: "quote", text: n.body }, ...(n.handoverId ? [{ kind: "callout" as const, tone: "info" as const, text: "A handover workspace is attached: the files, your notes and the knowledge check live on your inbox page." }] : [])],
+      blocks: [{ kind: "quote", text: n.body, untrusted: true }, ...(n.handoverId ? [{ kind: "callout" as const, tone: "info" as const, text: "A handover workspace is attached: the files, your notes and the knowledge check live on your inbox page." }] : [])],
       cta: { label: "Read and acknowledge", url: `${appUrl()}/me` },
       secondary: [{ label: "Printable letter", url: `${appUrl()}/letter/${n.id}` }, ...(n.handoverId ? [{ label: "Open the handover", url: `${appUrl()}/me#handover-${n.handoverId}` }] : [])],
       reason: `You are receiving this because you are a member of ${org.name} on Ghost-Architect.`,

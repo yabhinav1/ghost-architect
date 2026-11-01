@@ -3,6 +3,7 @@ import { LlmError } from "@/lib/llm";
 import { generateQuiz, grade } from "@/lib/quiz";
 import { stripQuiz } from "@/lib/quiz-client";
 import { audit, canManage, membership } from "@/lib/roles";
+import { rateLimit, tooMany } from "@/lib/ratelimit";
 import { getSession } from "@/lib/session";
 import type { Handover } from "@/lib/types";
 
@@ -24,6 +25,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const l = await load(id);
   if ("res" in l) return l.res;
   if (l.me !== l.h.leaverLogin && !l.manager) return Response.json({ error: "The leaver or a manager generates the quiz; the receiver takes it" }, { status: 403 });
+  const limit = rateLimit(_req, "llm", l.session.login);
+  if (!limit.ok) return tooMany(limit, "quiz generation");
   try {
     const quiz = await generateQuiz(l.h, l.session.login);
     await put<Handover>("handovers", { ...l.h, quiz });
@@ -47,11 +50,20 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   } catch {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const answers = (body.answers ?? []).map((n) => Number(n));
+  const questions = l.h.quiz.questions;
+  const answers = Array.isArray(body.answers) ? body.answers.map((n) => Number(n)) : [];
+  if (answers.length !== questions.length || answers.some((a, i) => !Number.isInteger(a) || a < 0 || a >= questions[i].choices.length)) {
+    return Response.json({ error: "Answer every question before submitting" }, { status: 400 });
+  }
+  // The receiver gets one scored attempt per generated quiz: the key must not be learnable by retrying.
+  if (l.me === l.h.receiverLogin && l.h.quiz.attempts.some((a) => a.by === l.me)) {
+    return Response.json({ error: "You have already taken this knowledge check. Ask the leaver to regenerate it for another attempt." }, { status: 409 });
+  }
   const { score, total } = grade(l.h.quiz, answers);
   const attempt = { by: l.me, score, total, at: new Date().toISOString(), answers };
   const quiz = { ...l.h.quiz, attempts: [...l.h.quiz.attempts, attempt].slice(-20) };
   await put<Handover>("handovers", { ...l.h, quiz });
   await audit(l.h.orgId, l.session.login, "quiz.attempt", l.h.id, { score, total });
-  return Response.json({ score, total, review: l.h.quiz.questions.map((q, i) => ({ id: q.id, correct: answers[i] === q.answer, answer: q.answer, explanation: q.explanation })) });
+  // Correct answers are confirmed; wrong ones get the explanation but never the key.
+  return Response.json({ score, total, review: questions.map((q, i) => ({ id: q.id, correct: answers[i] === q.answer, answer: answers[i] === q.answer ? q.answer : null, explanation: q.explanation })) });
 }

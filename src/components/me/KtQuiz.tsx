@@ -5,7 +5,7 @@ import type { Quiz, QuizAttempt } from "@/lib/types";
 
 /** Quiz as the client sees it: answers and explanations are stripped on the server until an attempt is graded. */
 export type ClientQuiz = Omit<Quiz, "questions"> & { questions: { id: string; file: string; question: string; choices: string[] }[] };
-type Review = { id: string; correct: boolean; answer: number; explanation: string }[];
+type Review = { id: string; correct: boolean; answer: number | null; explanation: string }[];
 
 export const PASS_MARK = 0.8;
 
@@ -24,6 +24,7 @@ export function KtQuiz({ handoverId, quiz: initial, mine, receiverLogin, meLogin
   const best = bestOf(quiz?.attempts ?? [], receiverLogin);
   const passed = Boolean(best && best.score / best.total >= PASS_MARK);
   const answered = quiz ? quiz.questions.filter((q) => answers[q.id] !== undefined).length : 0;
+  const taken = Boolean(quiz && mine === "receiver" && quiz.attempts.some((a) => a.by === meLogin));
 
   async function generate() {
     setBusy("generate"); setError(null); setReview(null); setResult(null); setAnswers({});
@@ -71,7 +72,7 @@ export function KtQuiz({ handoverId, quiz: initial, mine, receiverLogin, meLogin
                     {q.choices.map((c, ci) => {
                       const chosen = answers[q.id] === ci;
                       const isAnswer = rv && rv.answer === ci;
-                      const cls = rv ? (isAnswer ? "border-success bg-success-muted text-fg" : chosen ? "border-danger text-fg-muted line-through" : "border-border-muted text-fg-subtle") : chosen ? "border-accent bg-accent-muted text-fg" : "border-border-muted hover:border-border hover:bg-canvas-subtle";
+                      const cls = rv ? (isAnswer ? "border-success bg-success-muted text-fg" : chosen ? "border-danger bg-danger-muted/40 text-fg" : "border-border-muted text-fg-subtle") : chosen ? "border-accent bg-accent-muted text-fg" : "border-border-muted hover:border-border hover:bg-canvas-subtle";
                       return (
                         <button key={ci} disabled={Boolean(review) || busy !== null} onClick={() => setAnswers((a) => ({ ...a, [q.id]: ci }))} className={`flex items-start gap-2 rounded-md border px-2 py-1.5 text-left text-[12px] ${cls}`}>
                           <span className={`mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[10px] ${chosen || isAnswer ? "border-current" : "border-border"}`}>{String.fromCharCode(65 + ci)}</span>
@@ -86,7 +87,9 @@ export function KtQuiz({ handoverId, quiz: initial, mine, receiverLogin, meLogin
             })}
           </ol>
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            {!review ? (
+            {!review && taken ? (
+              <span className="text-[12px] text-fg-muted">You have taken this knowledge check{best ? `: ${best.score}/${best.total}` : ""}. The leaver can regenerate it for another attempt.</span>
+            ) : !review ? (
               <>
                 <button onClick={submit} disabled={busy !== null || answered < quiz.questions.length} className="btn btn-sm btn-primary">{busy === "submit" ? "Grading…" : "Submit answers"}</button>
                 <span className="text-[12px] text-fg-muted">{answered}/{quiz.questions.length} answered{mine !== "receiver" ? " · you can take it too, but only the receiver's score counts" : ""}</span>
@@ -94,7 +97,8 @@ export function KtQuiz({ handoverId, quiz: initial, mine, receiverLogin, meLogin
             ) : (
               <>
                 <span className={`label ${result && result.score / result.total >= PASS_MARK ? "label-success" : "label-attention"}`}>{result?.score}/{result?.total} · {result && result.score / result.total >= PASS_MARK ? "passed" : "below 80%, try again"}</span>
-                <button onClick={() => { setReview(null); setResult(null); setAnswers({}); }} className="btn btn-sm">Retake</button>
+                {mine !== "receiver" && <button onClick={() => { setReview(null); setResult(null); setAnswers({}); }} className="btn btn-sm">Try again</button>}
+                {mine === "receiver" && result && result.score / result.total < PASS_MARK && <span className="text-[12px] text-fg-muted">One attempt per quiz. Ask the leaver to regenerate it for another go.</span>}
               </>
             )}
             {quiz.attempts.length > 0 && <span className="ml-auto text-[11px] text-fg-subtle">{quiz.attempts.length} attempt{quiz.attempts.length === 1 ? "" : "s"} · best by @{receiverLogin}: {best ? `${best.score}/${best.total}` : "none yet"}</span>}

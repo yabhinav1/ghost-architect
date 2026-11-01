@@ -1,6 +1,7 @@
 import { get, put } from "@/lib/db";
 import { audit, membership, canManage } from "@/lib/roles";
 import { getSession } from "@/lib/session";
+import { stripQuiz } from "@/lib/quiz-client";
 import type { Handover, HandoverFile } from "@/lib/types";
 
 /** Leaver, receiver, or a manager updates files (notes, links, done) or completes the handover. */
@@ -45,5 +46,5 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     next.completedAt = undefined;
   }
   await put("handovers", next);
-  return Response.json({ handover: next });
+  return Response.json({ handover: stripQuiz(next) });
 }

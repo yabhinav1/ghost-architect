@@ -12,10 +12,26 @@ const REASONS: Record<string, string> = {
   rejected: "GitHub rejects the client id and secret configured on this server. Regenerate the secret on the OAuth App page and update the host, or create a GitHub App now and sign in through it instead.",
 };
 
-async function SetupBody({ searchParams }: { searchParams: Promise<{ reason?: string }> }) {
+async function SetupBody({ searchParams }: { searchParams: Promise<{ reason?: string; token?: string }> }) {
   const { config, problem } = await getActiveAppConfig();
   if (config) redirect("/api/auth/login");
-  const { reason } = await searchParams;
+  const { reason, token } = await searchParams;
+  // A server whose operator already set GITHUB_CLIENT_ID/SECRET (even a broken pair) is only reconfigured by that operator: ?token=SETUP_TOKEN.
+  const envPairPresent = Boolean(process.env.GITHUB_CLIENT_ID?.trim() && process.env.GITHUB_CLIENT_SECRET?.trim());
+  const setupToken = process.env.SETUP_TOKEN?.trim();
+  const operator = Boolean(setupToken && token && token === setupToken);
+  if (envPairPresent && !operator) {
+    return (
+      <div className="hero-glow flex min-h-screen flex-col items-center justify-center px-6">
+        <div className="card w-full max-w-lg p-6 text-center">
+          <Mascot size={96} className="mx-auto" />
+          <h1 className="mt-3 text-xl font-semibold">Sign-in is configured by the operator</h1>
+          <p className="mt-2 text-[14px] text-fg-muted">This server has GitHub credentials set in its environment{problem ? ", but GitHub is rejecting them" : ""}. Only the operator can change them: fix the variables on the host, or open this page with <code>?token=</code> matching the server&rsquo;s <code>SETUP_TOKEN</code>.</p>
+          <a href="/api/health" className="btn mt-4">Check /api/health</a>
+        </div>
+      </div>
+    );
+  }
   const why = REASONS[reason ?? problem ?? ""];
   const h = await headers();
   const proto = h.get("x-forwarded-proto") ?? "http";
@@ -44,7 +60,7 @@ async function SetupBody({ searchParams }: { searchParams: Promise<{ reason?: st
         <p className="mt-2 text-[14px] text-fg-muted">
           GitHub needs an app behind every &ldquo;Sign in with GitHub&rdquo; button. Click below and GitHub creates <b className="text-fg">Ghost-Architect</b> on your account with the right settings already filled in. Confirm once, and you&rsquo;re back here signed in.
         </p>
-        <SetupForm manifest={JSON.stringify(manifest)} state={state} />
+        <SetupForm manifest={JSON.stringify(manifest)} state={state} token={operator ? token : undefined} />
         <p className="mt-4 text-[12px] text-fg-subtle">
           Creates a GitHub App that can read repository contents, metadata and pull requests. Nothing is written back. The credentials are stored on this machine in <code>.cache/github-app.json</code> and <code>.env.local</code>.
         </p>

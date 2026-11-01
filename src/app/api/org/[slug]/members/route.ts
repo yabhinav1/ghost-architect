@@ -39,6 +39,7 @@ export async function PATCH(request: Request, { params }: Params) {
   const self = m.login === g.login.toLowerCase();
   const manager = g.access.role === "owner" || g.access.role === "manager";
   if (!manager && !self) return Response.json({ error: "You can only edit your own details" }, { status: 403 });
+  if (m.role === "owner" && !self && g.access.role !== "owner") return Response.json({ error: "Only an owner can edit an owner" }, { status: 403 });
   const next: Member = { ...m };
   if (body.email !== undefined) next.email = body.email.trim().toLowerCase().slice(0, 200) || undefined;
   if (body.name !== undefined && body.name.trim()) next.name = body.name.trim().slice(0, 120);

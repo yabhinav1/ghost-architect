@@ -79,6 +79,7 @@ export async function createTransfer(actor: Actor, raw: unknown): Promise<WorkTr
   // Read access alone does not authorise a user to redistribute another team's private work.
   if (!info.permissions?.push && !info.permissions?.admin) throw new TransferError("You need write or admin access to hand off this repository's work.", 403);
   const wantsGrant = input.access !== "none" || input.ownership;
+  if (wantsGrant && !process.env.AUTH_SECRET?.trim() && process.env.NODE_ENV === "production") throw new TransferError("This host has no AUTH_SECRET, so it cannot hold a GitHub authorisation safely. Send the handoff without GitHub changes and grant access after acceptance.", 503);
   if (wantsGrant && !info.permissions?.admin) throw new TransferError("Only a repository admin can grant access or transfer ownership. Send the handoff without GitHub changes, or ask an admin.", 403);
   if (input.ownership && info.owner?.type === "Organization") throw new TransferError("Ownership of an organisation-owned repository is transferred by an organisation owner on GitHub, not through a personal token.", 403);
   const now = new Date().toISOString();
@@ -104,19 +105,21 @@ export async function createTransfer(actor: Actor, raw: unknown): Promise<WorkTr
     meta: `Work handoff from @${actor.login}${org ? ` · ${org.name}` : ""} · ${now.slice(0, 10)}`,
     blocks: [
       { kind: "facts", rows: [{ label: "Repository", value: repoName, href: url }, ...(input.branch ? [{ label: "Branch / PR", value: input.branch }] : []), { label: "From", value: `@${actor.login}`, href: `https://github.com/${actor.login}` }, { label: "Sent to", value: input.recipientEmail }] },
-      { kind: "quote", label: "Handoff notes", text: input.notes.slice(0, 4000) },
+      { kind: "quote", label: "Handoff notes", text: input.notes.slice(0, 4000), untrusted: true },
       ...(grant ? [grant] : []),
       { kind: "paragraph", text: `Sign in with the GitHub account that has ${input.recipientEmail} as a verified email to accept or decline.` },
     ],
     cta: { label: "Review the handoff", url: `${appUrl()}/me#transfer-${t.id}` },
     secondary: [{ label: "Open the repository", url }],
-    reason: `You are receiving this because @${actor.login} addressed a work handoff to ${input.recipientEmail}.`,
+    reason: `You are receiving this because GitHub user @${actor.login} addressed a work handoff to ${input.recipientEmail}. Ghost-Architect did not check the content; if it looks wrong, ignore it.`,
   });
   void sendMail({ to: input.recipientEmail, subject: `[${repoName}] Work handoff from @${actor.login}: ${input.title}`, ...email });
   return t;
 }
 
 type Grant = { token: string; login: string; at: string };
+/** A sealed sender authorisation is honoured for a week; after that the sender grants access by hand. */
+const GRANT_TTL_MS = 7 * 86_400_000;
 
 async function currentAccess(slug: string, login: string, token: string): Promise<"admin" | "push" | "read" | "none"> {
   const res = await fetch(`https://api.github.com/repos/${slug}/collaborators/${encodeURIComponent(login)}/permission`, { headers: headers(token), cache: "no-store", signal: AbortSignal.timeout(10000) });
@@ -161,7 +164,7 @@ async function runGrant(t: WorkTransfer): Promise<WorkTransfer> {
   if (!t.grant || !t.recipientLogin || (t.grant.access === "none" && !t.grant.ownership)) return { ...t, sealedGrant: undefined };
   const g = t.sealedGrant ? unseal<Grant>(t.sealedGrant) : null;
   const now = new Date().toISOString();
-  if (!g?.token) return { ...t, sealedGrant: undefined, githubAccess: "failed", grantError: "The sender's authorisation expired; ask them to grant access from their sent handoffs.", grantRanAt: now };
+  if (!g?.token || !g.at || Date.now() - Date.parse(g.at) > GRANT_TTL_MS || g.login !== t.senderLogin) return { ...t, sealedGrant: undefined, githubAccess: "failed", grantError: "The sender's authorisation expired; ask them to grant access from their sent handoffs.", grantRanAt: now };
   const slug = t.repoUrl.slice("https://github.com/".length);
   let next: WorkTransfer = { ...t, sealedGrant: undefined, grantRanAt: now, grantError: undefined };
   try {

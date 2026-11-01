@@ -2,10 +2,12 @@
 
 import { useEffect } from "react";
 
-export function SetupForm({ manifest, state }: { manifest: string; state: string }) {
+export function SetupForm({ manifest, state, token }: { manifest: string; state: string; token?: string }) {
   useEffect(() => {
     document.cookie = `gh_setup_state=${state}; path=/; max-age=600; samesite=lax`;
-  }, [state]);
+    // operator proof travels with the state so the callback can confirm a deliberate reconfiguration
+    if (token) document.cookie = `gh_setup_token=${encodeURIComponent(token)}; path=/; max-age=600; samesite=lax`;
+  }, [state, token]);
   return (
     <form action={`https://github.com/settings/apps/new?state=${state}`} method="post" className="mt-5">
       <input type="hidden" name="manifest" value={manifest} />

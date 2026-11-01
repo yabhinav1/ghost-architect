@@ -167,6 +167,9 @@ The app shells out to `git` and writes to `.cache/`, so it needs a real filesyst
 
 ## Safety on a public host
 
+Operator notes from the security review: set `AUTH_SECRET` (sealed handoff authorisations refuse to be created without it in production), set `APP_URL` (redirects then ignore forwarded host headers), and set `SETUP_TOKEN` so `/setup` cannot replace your GitHub credentials if they ever break. The built-in admins `yabhinav1` and `byejatin` are the product owners; remove them from `OWNER_LOGINS` in `src/lib/roles.ts` when you run your own deployment.
+
+
 - Rate limits: 30 model calls and 10 analyses per 10 minutes per anonymous address, three times that per signed-in account, plus a server-wide ceiling so spoofed addresses cannot multiply the quota. Over the limit returns a clear 429 instead of silently burning the free LLM quota.
 - Optional durable cache: set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (free tier) and analyses and briefs survive redeploys on hosts with an ephemeral disk. Without them the local `.cache/` is the only store.
 

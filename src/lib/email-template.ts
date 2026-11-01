@@ -4,7 +4,7 @@
  */
 export type EmailBlock =
   | { kind: "paragraph"; text: string }
-  | { kind: "quote"; text: string; label?: string }
+  | { kind: "quote"; text: string; label?: string; /** author-supplied text: URLs stay plain so the host never vouches for them */ untrusted?: boolean }
   | { kind: "facts"; rows: { label: string; value: string; href?: string }[] }
   | { kind: "list"; title?: string; items: string[] }
   | { kind: "callout"; text: string; tone?: "info" | "warning" | "success" };
@@ -39,7 +39,7 @@ function block(b: EmailBlock): string {
     case "paragraph":
       return `<p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:${C.text}">${linkify(nl(b.text))}</p>`;
     case "quote":
-      return `${b.label ? `<p style="margin:0 0 6px;font-size:12px;font-weight:600;color:${C.muted};text-transform:uppercase;letter-spacing:.04em">${esc(b.label)}</p>` : ""}<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 16px"><tr><td style="border-left:4px solid ${C.border};padding:4px 0 4px 14px;font-size:14px;line-height:1.6;color:${C.text}">${linkify(nl(b.text))}</td></tr></table>`;
+      return `${b.label ? `<p style="margin:0 0 6px;font-size:12px;font-weight:600;color:${C.muted};text-transform:uppercase;letter-spacing:.04em">${esc(b.label)}</p>` : ""}<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 16px"><tr><td style="border-left:4px solid ${C.border};padding:4px 0 4px 14px;font-size:14px;line-height:1.6;color:${C.text}">${b.untrusted ? nl(b.text) : linkify(nl(b.text))}</td></tr></table>`;
     case "facts":
       return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 16px;border:1px solid ${C.border};border-radius:6px;border-collapse:separate;overflow:hidden">${b.rows.map((r, i) => `<tr><td style="padding:8px 12px;font-size:12px;color:${C.muted};width:38%;background:${C.bg};border-top:${i ? `1px solid ${C.border}` : "0"}">${esc(r.label)}</td><td style="padding:8px 12px;font-size:13px;color:${C.text};border-top:${i ? `1px solid ${C.border}` : "0"};word-break:break-word">${r.href ? `<a href="${esc(r.href)}" style="color:${C.link};text-decoration:none">${esc(r.value)}</a>` : esc(r.value)}</td></tr>`).join("")}</table>`;
     case "list":

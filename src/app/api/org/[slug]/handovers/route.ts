@@ -1,4 +1,5 @@
 import { createHandover, handoversOf, sendNotice, NOTICE_TEMPLATES, fillTemplate } from "@/lib/org";
+import { stripQuiz } from "@/lib/quiz-client";
 import { membership } from "@/lib/roles";
 import { guard, json } from "../_guard";
 
@@ -11,7 +12,7 @@ export async function GET(_req: Request, { params }: Params) {
   const all = await handoversOf(g.access.org.id);
   const manager = g.access.role === "owner" || g.access.role === "manager" || g.access.role === "admin-support";
   const me = g.login.toLowerCase();
-  return Response.json({ handovers: manager ? all : all.filter((h) => h.leaverLogin === me || h.receiverLogin === me) });
+  return Response.json({ handovers: (manager ? all : all.filter((h) => h.leaverLogin === me || h.receiverLogin === me)).map(stripQuiz) });
 }
 
 /** Create a handover from a leaver to a receiver for one repo; both get a notice. */
@@ -33,7 +34,7 @@ export async function POST(request: Request, { params }: Params) {
         await sendNotice(g.access.org, g.login, { toLogin: m.login, type: "handover", subject: fillTemplate(NOTICE_TEMPLATES.handover.subject, vars), body: fillTemplate(NOTICE_TEMPLATES.handover.body, vars), handoverId: h.id });
       }
     }
-    return Response.json({ handover: h });
+    return Response.json({ handover: stripQuiz(h) });
   } catch (e) {
     return Response.json({ error: (e as Error).message }, { status: 400 });
   }
