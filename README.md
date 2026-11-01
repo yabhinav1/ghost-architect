@@ -9,7 +9,8 @@
 A bus-factor radar for codebases that lost their authors. It scores every file by how much of it belongs to people who left, explains why risky files exist from commit and pull-request evidence, and runs the handover before the person walks out the door.
 
 [![Live](https://img.shields.io/badge/live-ghost--architect.onrender.com-2ea043?style=for-the-badge&logo=render&logoColor=white)](https://ghost-architect.onrender.com)
-[![Deck](https://img.shields.io/badge/deck-19%20slides-58a6ff?style=for-the-badge&logo=microsoftpowerpoint&logoColor=white)](docs/Ghost-Architect-overview.pptx)
+[![Slides](https://img.shields.io/badge/slides-Google%20Slides-f4b400?style=for-the-badge&logo=googleslides&logoColor=white)](https://docs.google.com/presentation/d/1olaqcdZ7Fw1iLo0kNAYphTliHTTlBPQJNLsY4mqym-U/edit?usp=sharing)
+[![Deck](https://img.shields.io/badge/deck-pptx%20download-58a6ff?style=for-the-badge&logo=microsoftpowerpoint&logoColor=white)](docs/Ghost-Architect-overview.pptx)
 [![Tests](https://img.shields.io/badge/tests-64%20passing-3fb950?style=for-the-badge&logo=githubactions&logoColor=white)](tests)
 [![Security review](https://img.shields.io/badge/security%20review-done%201%20Nov%202026-a371f7?style=for-the-badge&logo=shield&logoColor=white)](docs/SECURITY-QA.md)
 [![hackCBS](https://img.shields.io/badge/hackCBS-2026-d29922?style=for-the-badge)](https://hackculture.io)
@@ -23,7 +24,8 @@ A bus-factor radar for codebases that lost their authors. It scores every file b
 | What | Where |
 |---|---|
 | Live product | **https://ghost-architect.onrender.com** (public repos need no sign-in; try `expressjs/express`) |
-| Presentation deck (19 slides, animated) | [docs/Ghost-Architect-overview.pptx](docs/Ghost-Architect-overview.pptx) |
+| Presentation (Google Slides) | **[Open the slides](https://docs.google.com/presentation/d/1olaqcdZ7Fw1iLo0kNAYphTliHTTlBPQJNLsY4mqym-U/edit?usp=sharing)** |
+| Same deck as a download (19 slides, animated) | [docs/Ghost-Architect-overview.pptx](docs/Ghost-Architect-overview.pptx) |
 | Pitch: what, why different, why it matters | [docs/PITCH.md](docs/PITCH.md) |
 | Security questions and honest answers | [docs/SECURITY-QA.md](docs/SECURITY-QA.md) |
 | Demo script, 90 seconds | [Demo script](#demo-script) below |
