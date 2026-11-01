@@ -42,7 +42,7 @@ Sign in from the menu at the top right of the landing page as a **User**, an **O
 | --- | --- | --- | --- |
 | User | An engineer | Own repos, own inbox, handovers where they are the leaver or the receiver | Analyses repos, records notes and links per file during a handover, ticks files off, acknowledges notices |
 | Organisation (owner, manager) | The company | Members with GitHub login, name and git email; linked repos; the activity log of every commit matched to a member; notices and their read/acknowledge status; handover progress; audit log | Links repos, invites engineers, sets who is leaving and their last day, sends notices and letters from templates, assigns handovers from a leaver to a receiver, grants or revokes support access |
-| Admin | The people running Ghost-Architect (`ADMIN_LOGINS`) | Platform metrics, health, model lanes, every organisation's existence and settings, platform audit | Nothing inside an organisation unless its owner has switched on support access, which is audited |
+| Admin | The people running Ghost-Architect (`yabhinav1` always, plus `ADMIN_LOGINS`) | Platform metrics, health, model lanes, every organisation's existence and settings, platform audit | Nothing inside an organisation unless its owner has switched on support access, which is audited |
 
 Routes: `/org` your organisations, `/org/<slug>` overview, `/org/<slug>/activity`, `/org/<slug>/notices`, `/org/<slug>/handovers`, `/org/<slug>/settings`, `/me` inbox and handovers, `/invite/<token>` join, `/letter/<id>` printable notice, `/admin`.
 
@@ -137,12 +137,12 @@ The app shells out to `git` and writes to `.cache/`, so it needs a real filesyst
 
 ## Demo script
 
-1. **Notice period mode.** Analyse `expressjs/express`, pick the top author as the leaver, set a last day two weeks out. Show the handover plan, the countdown, and the receiver per file. Hit **Generate briefs for the top 10** and let them stream in.
-2. **Ask the ghost.** Open the reddest file and type a judge's question. Point at the evidence link or the "not documented" tag.
-3. **Layoffs mode.** Click **top 3 authors leave**. The map turns red. Show the absorption curves.
-4. **Live override.** Mark one author as still here and watch the map cool down.
-5. **Time machine.** Drag the slider back a year to show the bus factor was already bad.
-6. **Download CODEOWNERS** and open the report.
+1. **The radar.** Sign in as a User, analyse `expressjs/express`. Switch to **Layoffs**, click **top 3 authors leave**: the heatmap turns red, the riskiest files list fills. Open the reddest file and **Ask Casper** why it exists; point at the evidence commit and the "not documented" tag.
+2. **The organisation.** Sign in as Organisation, open your org. Members page: set one engineer to *leaving* with a last day two weeks out. Send them the notice-period letter from a template; show the printable letter and the read/acknowledge status.
+3. **The handover.** Handovers page: assign `expressjs/express` from the leaver to a receiver. The files come from the analysis. Show the **countdown** calendar and the **work in flight** panel (open PRs, branches, TODOs) with the readiness score.
+4. **The leaver's side.** Sign in as the leaver, open `/me`: the countdown, the notes and links per file, ticking files off, then **Generate from notes and briefs** to create the knowledge check.
+5. **The receiver's side.** Sign in as the receiver: take the knowledge check, see the per-question review, then open the **Day-one packet** and print it. Back on the org page the readiness score and the KT badge have moved.
+6. **Admin.** `/admin` for the platform view across organisations, and the audit log of everything that just happened.
 
 ## Operating it
 

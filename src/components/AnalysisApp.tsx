@@ -281,7 +281,7 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
               </span>
             </div>
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-fg-muted sm:text-[13px]">
-              <span className="flex items-center gap-1.5"><Octicon name="file" className="h-4 w-4" /><b className="text-fg">{analysis.analysedFiles}</b> of {analysis.totalFiles} code files</span>
+              <span className="flex items-center gap-1.5"><Octicon name="file" className="h-4 w-4" /><b className="text-fg">{analysis.analysedFiles}</b> code files{analysis.totalFiles > analysis.analysedFiles ? <span className="text-fg-subtle" title="Only source files count: media, data, docs, lockfiles, minified bundles and vendored directories are skipped."> of {analysis.totalFiles} tracked</span> : null}</span>
               <span className="flex items-center gap-1.5"><Octicon name="people" className="h-4 w-4" /><b className="text-fg">{Object.keys(analysis.authors).length}</b> authors</span>
               <span className="flex items-center gap-1.5"><Octicon name="people" className="h-4 w-4 text-danger" /><b className="text-fg">{departed.size}</b> departed</span>
               <span className="flex items-center gap-1.5"><Octicon name="flame" className={`h-4 w-4 ${redCount ? "text-danger" : ""}`} /><b className={redCount ? "text-danger" : "text-fg"}>{redCount}</b> high-risk files</span>

@@ -1,11 +1,14 @@
 import { get, list, put, newId } from "./db.ts";
 import type { AuditEntry, Member, Org, OrgRole } from "./types.ts";
 
-/** Platform administrators: comma-separated GitHub logins in ADMIN_LOGINS. */
+/** The account that owns the deployment. Always an admin, so a host without ADMIN_LOGINS still has one. */
+const OWNER_LOGINS = ["yabhinav1"];
+
+/** Platform administrators: the owner plus comma-separated GitHub logins in ADMIN_LOGINS. */
 export function isAdmin(login: string | null | undefined): boolean {
   if (!login) return false;
   const admins = (process.env.ADMIN_LOGINS ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
-  return admins.includes(login.toLowerCase());
+  return [...OWNER_LOGINS, ...admins].includes(login.toLowerCase());
 }
 
 export async function orgBySlug(slug: string): Promise<Org | null> {

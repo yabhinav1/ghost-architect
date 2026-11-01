@@ -441,7 +441,7 @@ export async function analyzeRepo(repoUrl: string, force = false, onProgress?: O
     repoUrl: url,
     analyzedAt: new Date().toISOString(),
     private: isPrivate,
-    totalFiles: code.length,
+    totalFiles: all.length,
     analysedFiles: files.length,
     files,
     authors,

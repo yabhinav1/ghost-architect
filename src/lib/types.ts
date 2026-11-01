@@ -31,6 +31,7 @@ export type Analysis = {
   analyzedAt: string;
   /** true for a private GitHub repo, false for public, undefined when GitHub could not be asked or the host is not GitHub */
   private?: boolean;
+  /** every tracked file in the clone, code or not */
   totalFiles: number;
   analysedFiles: number;
   files: FileStat[];
