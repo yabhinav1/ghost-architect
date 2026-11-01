@@ -54,8 +54,12 @@ export async function GET() {
   const mail = mailConfig();
   if (mail.configured) {
     const v = await verifySmtp();
-    out.mail = { status: v.ok ? "smtp" : "smtp-failing", host: mail.host, port: mail.port, from: mail.from, error: v.error, hint: v.ok ? undefined : /auth|credentials|535/i.test(v.error ?? "") ? "Gmail rejected the login. Use a 16-character app password (not the account password) from myaccount.google.com/apppasswords, with SMTP_USER set to the same Gmail address." : "The SMTP server could not be reached from this host. Try SMTP_PORT=587." };
-  } else out.mail = { status: "outbox", hint: "Set SMTP_USER and SMTP_PASS (Gmail: an app password) to deliver notices and handoffs by email; until then they are written to .cache/outbox and delivered in-app only." };
+    const hint = v.ok ? undefined
+      : mail.provider === "brevo" ? "Check BREVO_API_KEY and that MAIL_FROM uses a sender verified in Brevo."
+      : /auth|credentials|535/i.test(v.error ?? "") ? "Gmail rejected the login. Use a 16-character app password (not the account password) from myaccount.google.com/apppasswords, with SMTP_USER set to the same Gmail address."
+      : "The SMTP port is blocked or unreachable from this host. Try SMTP_PORT=587; if that also times out the host blocks SMTP, so use Brevo over HTTPS: set BREVO_API_KEY and MAIL_FROM to a sender verified in Brevo.";
+    out.mail = { status: v.ok ? mail.provider : `${mail.provider}-failing`, provider: mail.provider, host: mail.provider === "smtp" ? mail.host : undefined, port: mail.provider === "smtp" ? mail.port : undefined, from: mail.from, error: v.error, hint };
+  } else out.mail = { status: "outbox", hint: "Set BREVO_API_KEY + MAIL_FROM (HTTPS, works on hosts that block SMTP) or SMTP_USER + SMTP_PASS (Gmail app password) to deliver notices and handoffs by email; until then they are written to .cache/outbox and delivered in-app only." };
   out.appUrl = process.env.APP_URL ?? null;
 
   return Response.json(out, { status: out.ok ? 200 : 503, headers: { "Cache-Control": "no-store" } });

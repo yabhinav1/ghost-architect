@@ -41,7 +41,7 @@ async function Body() {
   }
   const lanes = laneSummary();
   const mail = mailConfig();
-  const mailStatus = mail.configured ? ((await verifySmtp()).ok ? "smtp" : "smtp-failing") : "outbox";
+  const mailStatus = mail.configured ? ((await verifySmtp()).ok ? mail.provider : `${mail.provider}-failing`) : "outbox";
   const platformAudit = audit.filter((a) => a.orgId === null || a.action.startsWith("org.supportAccess") || a.action === "org.create").sort((a, b) => b.at.localeCompare(a.at)).slice(0, 60);
   return (
     <div className="min-h-screen">

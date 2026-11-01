@@ -8,7 +8,7 @@ import nodemailer from "nodemailer";
  * treat delivery as best effort and the in-app inbox remains the source of truth.
  */
 export type Mail = { to: string; subject: string; text: string; html?: string };
-export type MailResult = { sent: boolean; via: "smtp" | "outbox"; error?: string };
+export type MailResult = { sent: boolean; via: "smtp" | "brevo" | "outbox"; error?: string };
 
 export function mailConfig() {
   const user = process.env.SMTP_USER?.trim();
@@ -16,8 +16,28 @@ export function mailConfig() {
   const pass = process.env.SMTP_PASS?.replace(/\s+/g, "");
   const host = process.env.SMTP_HOST?.trim() || "smtp.gmail.com";
   const port = Number(process.env.SMTP_PORT || 465);
+  // Brevo (free tier, HTTPS) for hosts that block outbound SMTP ports, such as Render's free plan.
+  const brevoKey = process.env.BREVO_API_KEY?.trim();
   const from = process.env.MAIL_FROM?.trim() || (user ? `Ghost-Architect <${user}>` : "");
-  return { configured: Boolean(user && pass), user, pass, host, port, from };
+  const provider: "brevo" | "smtp" | "none" = brevoKey && from ? "brevo" : user && pass ? "smtp" : "none";
+  return { configured: provider !== "none", provider, brevoKey, user, pass, host, port, from };
+}
+
+function parseFrom(from: string): { name: string; email: string } {
+  const m = from.match(/^\s*(?:"?([^"<]*)"?\s*)?<([^>]+)>\s*$/);
+  return m ? { name: (m[1] ?? "").trim() || "Ghost-Architect", email: m[2].trim() } : { name: "Ghost-Architect", email: from.trim() };
+}
+
+async function sendBrevo(m: Mail, key: string, from: string): Promise<MailResult> {
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: { "api-key": key, "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ sender: parseFrom(from), to: [{ email: m.to }], subject: m.subject, textContent: m.text, htmlContent: m.html ?? toHtml(m.text) }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (res.status === 201 || res.status === 202) return { sent: true, via: "brevo" };
+  const detail = await res.json().catch(() => ({})) as { message?: string; code?: string };
+  return { sent: false, via: "brevo", error: `Brevo ${res.status}${detail.message ? `: ${detail.message}` : ""}` };
 }
 
 const NOREPLY = /@users\.noreply\.github\.com$/i;
@@ -33,7 +53,7 @@ export function appUrl(): string {
 let transport: nodemailer.Transporter | null = null;
 function smtp() {
   const c = mailConfig();
-  if (!c.configured) return null;
+  if (c.provider !== "smtp") return null;
   transport ??= nodemailer.createTransport({ host: c.host, port: c.port, secure: c.port === 465, auth: { user: c.user, pass: c.pass }, connectionTimeout: 15_000, greetingTimeout: 15_000, socketTimeout: 30_000 });
   return transport;
 }
@@ -41,12 +61,18 @@ function smtp() {
 let verified: { at: number; ok: boolean; error?: string } | null = null;
 /** Logs in to the SMTP server without sending anything. Cached for five minutes. */
 export async function verifySmtp(): Promise<{ ok: boolean; error?: string }> {
-  const t = smtp();
-  if (!t) return { ok: false, error: "SMTP not configured" };
+  const c = mailConfig();
+  if (c.provider === "none") return { ok: false, error: "No email provider configured" };
   if (verified && Date.now() - verified.at < 300_000) return verified;
   try {
-    await t.verify();
-    verified = { at: Date.now(), ok: true };
+    if (c.provider === "brevo") {
+      const res = await fetch("https://api.brevo.com/v3/account", { headers: { "api-key": c.brevoKey!, Accept: "application/json" }, signal: AbortSignal.timeout(10_000) });
+      if (!res.ok) throw new Error(`Brevo rejected the API key (${res.status})`);
+      verified = { at: Date.now(), ok: true };
+    } else {
+      await smtp()!.verify();
+      verified = { at: Date.now(), ok: true };
+    }
   } catch (e) {
     verified = { at: Date.now(), ok: false, error: (e as Error).message };
   }
@@ -62,6 +88,13 @@ export async function sendMail(m: Mail): Promise<MailResult> {
 async function deliver(m: Mail): Promise<MailResult> {
   if (!deliverable(m.to)) return { sent: false, via: "outbox", error: "no deliverable address" };
   const c = mailConfig();
+  if (c.provider === "brevo") {
+    try {
+      return await sendBrevo(m, c.brevoKey!, c.from);
+    } catch (e) {
+      return { sent: false, via: "brevo", error: (e as Error).message };
+    }
+  }
   const t = smtp();
   if (t) {
     try {

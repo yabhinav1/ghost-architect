@@ -30,6 +30,8 @@ services:
       - key: GITHUB_TOKEN
         sync: false
       # Optional: SMTP so notices and work handoffs also go out by email (Gmail app password works).
+      - key: BREVO_API_KEY
+        sync: false
       - key: SMTP_USER
         sync: false
       - key: SMTP_PASS

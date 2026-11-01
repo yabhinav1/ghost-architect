@@ -18,7 +18,7 @@ export function MailTest({ status, defaultTo }: { status: string; defaultTo: str
   }
   return (
     <li className="px-4 py-2">
-      <div className="flex items-center justify-between"><span>Email (SMTP)</span><span className={`label ${status === "smtp" ? "label-success" : status === "outbox" ? "label-muted" : "label-danger"}`}>{status}</span></div>
+      <div className="flex items-center justify-between"><span>Email (SMTP)</span><span className={`label ${status === "smtp" || status === "brevo" ? "label-success" : status === "outbox" ? "label-muted" : "label-danger"}`}>{status}</span></div>
       <div className="mt-2 flex gap-2">
         <input value={to} onChange={(e) => setTo(e.target.value)} className="input flex-1 text-[12px]" placeholder="you@example.com" />
         <button onClick={send} disabled={busy || !to} className="btn btn-sm">{busy ? "Sending…" : "Send test"}</button>

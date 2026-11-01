@@ -73,7 +73,7 @@ Routes: `GET /api/handover/<id>/packet` (JSON, `?format=md` to download), `POST 
 
 ### Email delivery
 
-Notices, letters, handover assignments and work handoffs are always delivered in-app. Set `SMTP_USER` and `SMTP_PASS` (Gmail: a 16-character app password from Google Account → Security → 2-Step Verification → App passwords) and they are also emailed: notices go to the member's git email, handoffs to the recipient address the sender typed. Without SMTP every message is written to `.cache/outbox/` as JSON so you can see what would have gone out. `/api/health` reports `mail: smtp` or `outbox`.
+Notices, letters, handover assignments and work handoffs are always delivered in-app. Configure a provider and they are also emailed. On Render, whose free plan blocks outbound SMTP ports, use Brevo over HTTPS (free, 300 a day): verify your sender address in Brevo, create an API key, set `BREVO_API_KEY` and `MAIL_FROM="Ghost-Architect <that address>"`. Elsewhere, `SMTP_USER` and `SMTP_PASS` (Gmail: a 16-character app password from Google Account → Security → 2-Step Verification → App passwords) work too: notices go to the member's git email, handoffs to the recipient address the sender typed. Without SMTP every message is written to `.cache/outbox/` as JSON so you can see what would have gone out. `/api/health` reports `mail: smtp` or `outbox`.
 
 ### Work handoffs that change GitHub access
 
