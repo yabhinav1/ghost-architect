@@ -71,6 +71,14 @@ Every handover carries four things beyond the file list:
 
 Routes: `GET /api/handover/<id>/packet` (JSON, `?format=md` to download), `POST /api/handover/<id>/quiz` generate, `PUT /api/handover/<id>/quiz` submit answers, `GET /api/org/<slug>/pending?login=&repo=` work in flight.
 
+### Email delivery
+
+Notices, letters, handover assignments and work handoffs are always delivered in-app. Set `SMTP_USER` and `SMTP_PASS` (Gmail: a 16-character app password from Google Account → Security → 2-Step Verification → App passwords) and they are also emailed: notices go to the member's git email, handoffs to the recipient address the sender typed. Without SMTP every message is written to `.cache/outbox/` as JSON so you can see what would have gone out. `/api/health` reports `mail: smtp` or `outbox`.
+
+### Work handoffs that change GitHub access
+
+When sending a handoff the sender chooses what happens on GitHub the moment the recipient accepts: nothing, add them as a collaborator with write or admin access, and optionally transfer ownership of a personally owned repository. The sender must be a repository admin at send time; their GitHub token is sealed with the server secret on the handoff record and used once, at acceptance, then dropped (also dropped on decline or cancel). Ownership transfer calls GitHub's repository transfer API: GitHub emails the new owner, who has one day to accept; the repository stays put until then. Organisation-owned repositories cannot be transferred this way. If a step fails, the sender gets a retry button that uses their live session.
+
 ## Accounts and access
 
 Ghost-Architect is multi-user. Each GitHub account gets:

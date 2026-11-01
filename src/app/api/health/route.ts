@@ -1,6 +1,7 @@
 import { getAppConfig, validateClientPair } from "@/lib/app-config";
 import { looksLikeGithubToken, serverGithubToken } from "@/lib/env";
 import { llmConfig } from "@/lib/llm";
+import { mailConfig } from "@/lib/mail";
 import { storeEnabled } from "@/lib/store";
 
 /**
@@ -50,6 +51,8 @@ export async function GET() {
   out.llm = { status: llm.apiKey ? "configured" : "missing", baseUrl: llm.baseUrl, model: llm.model };
   if (!llm.apiKey) out.ok = false;
   out.durableStore = storeEnabled ? "on" : "off";
+  const mail = mailConfig();
+  out.mail = { status: mail.configured ? "smtp" : "outbox", host: mail.configured ? mail.host : undefined, from: mail.configured ? mail.from : undefined, hint: mail.configured ? undefined : "Set SMTP_USER and SMTP_PASS (Gmail: an app password) to deliver notices and handoffs by email; until then they are written to .cache/outbox and delivered in-app only." };
   out.appUrl = process.env.APP_URL ?? null;
 
   return Response.json(out, { status: out.ok ? 200 : 503, headers: { "Cache-Control": "no-store" } });

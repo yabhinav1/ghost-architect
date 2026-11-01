@@ -19,6 +19,7 @@ export function TransferComposer({ organisations }: { organisations: { id: strin
       const response = await fetch("/api/me/transfers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
         recipientEmail: fields.get("recipientEmail"), title: fields.get("title"), repoUrl: fields.get("repoUrl"),
         branch: fields.get("branch"), notes: fields.get("notes"), ...(orgId ? { orgId } : {}),
+        access: fields.get("access") || "none", ownership: fields.get("ownership") === "on",
       }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Could not send handoff.");
@@ -37,7 +38,12 @@ export function TransferComposer({ organisations }: { organisations: { id: strin
       <label className="block">GitHub repository<input className="input mt-1 w-full" name="repoUrl" type="url" maxLength={500} placeholder="https://github.com/team/project" required disabled={busy} /></label>
       <label className="block">Branch or pull request reference <span className="text-fg-muted">(optional)</span><input className="input mt-1 w-full" name="branch" maxLength={200} placeholder="feature/billing or PR #42" disabled={busy} /></label>
       <label className="block">Handoff notes<textarea className="input mt-1 min-h-36 w-full" name="notes" maxLength={20000} placeholder="What is done? What remains? Include relevant files, blockers, setup instructions and links." required disabled={busy} /></label>
-      <p className="text-xs text-fg-muted">You need write access to send this work. After the recipient accepts, a repository admin can separately invite them with GitHub write access. Repository ownership stays unchanged.</p>
+      <fieldset className="rounded-md border border-border p-3">
+        <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-fg-muted">GitHub access when they accept</legend>
+        <label className="block">Add them as a collaborator<select className="input mt-1 w-full" name="access" defaultValue="push" disabled={busy}><option value="none">No GitHub change, just the notes</option><option value="push">Write access (push code, open pull requests)</option><option value="admin">Admin access (manage settings and collaborators)</option></select></label>
+        <label className="mt-3 flex items-start gap-2"><input type="checkbox" name="ownership" className="check mt-1" disabled={busy} /><span>Transfer repository ownership to them on GitHub<span className="block text-xs text-fg-muted">For repositories you personally own. GitHub emails the new owner; the move completes when they accept, within one day. You keep access as a collaborator.</span></span></label>
+        <p className="mt-2 text-xs text-fg-muted">These run automatically the moment the recipient accepts, using the admin access you have now. You need admin on the repository for either; organisation policy can still block invitations.</p>
+      </fieldset>
       {error && <p role="alert" className="text-danger">{error}</p>}
       {sent && <p role="status" className="text-success">Handoff saved. It will appear in the recipient’s inbox when they sign in with the matching verified GitHub email. Track it below.</p>}
       <button className="btn btn-primary" disabled={busy}>{busy ? "Sending…" : "Send work handoff"}</button>
@@ -71,16 +77,21 @@ function TransferCard({ transfer: t }: { transfer: WorkTransfer & { incoming: bo
         <a className="break-all text-accent hover:underline" href={t.repoUrl} target="_blank" rel="noreferrer">{t.repoUrl} ↗</a>
         {t.branch && <p className="break-words text-fg-muted">Branch / PR: {t.branch}</p>}
         <p className="whitespace-pre-wrap break-words rounded-md bg-canvas-subtle p-3">{t.notes}</p>
-        <p className="text-xs text-fg-muted">Accepting records responsibility for this handoff. GitHub repository access is separate.</p>
+        {t.grant && (t.grant.access !== "none" || t.grant.ownership) && t.status === "pending" && <p className="text-xs text-fg-muted">On acceptance: {[t.grant.access !== "none" ? `collaborator with ${t.grant.access === "admin" ? "admin" : "write"} access` : null, t.grant.ownership ? "repository ownership transferred on GitHub" : null].filter(Boolean).join(" and ")}.</p>}
+        {(!t.grant || (t.grant.access === "none" && !t.grant.ownership)) && t.status === "pending" && <p className="text-xs text-fg-muted">Accepting records responsibility for this handoff. No GitHub access changes were requested.</p>}
         <div className="flex flex-wrap gap-2">
           {t.incoming && t.status === "pending" && <><button className="btn btn-sm btn-primary" disabled={busy} onClick={() => act("accept")}>Accept handoff</button><button className="btn btn-sm" disabled={busy} onClick={() => act("decline")}>Decline</button></>}
           {!t.incoming && t.status === "pending" && <button className="btn btn-sm" disabled={busy} onClick={() => act("cancel")}>Cancel handoff</button>}
-          {!t.incoming && t.status === "accepted" && !t.githubAccess && <button className="btn btn-sm" disabled={busy} onClick={() => { if (window.confirm(`Invite @${t.recipientLogin} with WRITE access to ${t.repoUrl}? This lets them push code. GitHub must permit you to manage repository access.`)) void act("invite"); }}>Invite @{t.recipientLogin} with GitHub write access</button>}
+          {!t.incoming && t.status === "accepted" && (!t.githubAccess || t.githubAccess === "failed") && <button className="btn btn-sm" disabled={busy} onClick={() => { if (window.confirm(`Invite @${t.recipientLogin} with ${t.grant?.access === "admin" ? "ADMIN" : "WRITE"} access to ${t.repoUrl}? GitHub must permit you to manage repository access.`)) void act("invite"); }}>{t.githubAccess === "failed" ? "Retry: add" : "Add"} @{t.recipientLogin} as collaborator</button>}
+          {!t.incoming && t.status === "accepted" && t.ownership !== "requested" && <button className="btn btn-sm" disabled={busy} onClick={() => { if (window.confirm(`Transfer ownership of ${t.repoUrl} to @${t.recipientLogin} on GitHub? GitHub will email them; the repository moves when they accept. This cannot be undone from here.`)) void act("transfer-ownership"); }}>{t.ownership === "failed" ? "Retry: transfer ownership" : "Transfer ownership on GitHub"}</button>}
+          {t.incoming && t.ownership === "requested" && <a href="https://github.com/notifications" target="_blank" rel="noreferrer" className="btn btn-sm btn-primary">Accept the ownership transfer on GitHub ↗</a>}
           {!t.incoming && <a href={`${t.repoUrl}/settings/access`} target="_blank" rel="noreferrer" className="btn btn-sm">Manage access on GitHub ↗</a>}
           {t.incoming && t.githubAccess === "invited" && <a href={`${t.repoUrl}/invitations`} target="_blank" rel="noreferrer" className="btn btn-sm btn-primary">Review GitHub invitation ↗</a>}
           {unread && <button className="btn btn-sm" disabled={busy} onClick={() => act("read")}>Mark read</button>}
         </div>
-        {t.githubAccess && <p className="text-xs text-success">{t.githubAccess === "invited" ? "GitHub confirmed an invitation. The recipient must accept it on GitHub." : "GitHub confirmed access when this handoff was updated."} Current access is managed on GitHub.</p>}
+        {t.githubAccess && t.githubAccess !== "failed" && <p className="text-xs text-success">{t.githubAccess === "invited" ? `GitHub sent @${t.recipientLogin} a collaborator invitation (${t.grant?.access === "admin" ? "admin" : "write"} access). It must be accepted on GitHub.` : "GitHub confirmed the collaborator access."} Current access is managed on GitHub.</p>}
+        {t.ownership === "requested" && <p className="text-xs text-success">Ownership transfer requested on GitHub. @{t.recipientLogin} has one day to accept it from GitHub&rsquo;s email; until then the repository stays where it is.</p>}
+        {t.grantError && <p className="text-xs text-danger">GitHub step failed: {t.grantError}</p>}
         {busy && <p role="status" className="text-xs text-fg-muted">Updating…</p>}
       </div>}
     </div>

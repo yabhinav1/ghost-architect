@@ -240,7 +240,15 @@ export type WorkTransfer = {
   updatedAt: string;
   senderReadAt?: string;
   recipientReadAt?: string;
-  githubAccess?: "invited" | "already-access";
+  githubAccess?: "invited" | "already-access" | "failed";
+  /** what the sender asked GitHub to do once the recipient accepts */
+  grant?: { access: "none" | "push" | "admin"; ownership: boolean };
+  /** sender's GitHub token, sealed with the server secret, kept only until the grant runs or the handoff ends */
+  sealedGrant?: string;
+  /** ownership transfer: GitHub emails the new owner, who must accept within a day */
+  ownership?: "requested" | "failed" | "done";
+  grantError?: string;
+  grantRanAt?: string;
 };
 
 export type InboxSummary = {

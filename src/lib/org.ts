@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import { del, get, list, newId, put } from "./db.ts";
 import { cacheDir, normalizeRepoUrl, repoKey } from "./git.ts";
 import { portfolioSummary, type PortfolioSummary } from "./insights.ts";
+import { appUrl, deliverable, sendMail } from "./mail.ts";
 import { audit, membersOf } from "./roles.ts";
 import { storeGet } from "./store.ts";
 import type { Analysis, Handover, HandoverFile, Invite, Member, Notice, NoticeType, Org, OrgRepo, OrgRole } from "./types.ts";
@@ -125,6 +126,10 @@ export async function sendNotice(org: Org, by: string, input: { toLogin: string;
   const n: Notice = { id: newId("n_"), orgId: org.id, toLogin: input.toLogin.toLowerCase(), type: input.type, subject: input.subject.slice(0, 200), body: input.body.slice(0, 20000), status: "sent", createdBy: by, createdAt: new Date().toISOString(), handoverId: input.handoverId };
   await put("notices", n);
   await audit(org.id, by, "notice.send", n.toLogin, { type: n.type, id: n.id });
+  const to = await get<Member>("members", `${org.id}:${n.toLogin}`);
+  if (deliverable(to?.email)) {
+    void sendMail({ to: to.email, subject: `[${org.name}] ${n.subject}`, text: `${n.body}\n\nRead and acknowledge it here: ${appUrl()}/me\nPrintable letter: ${appUrl()}/letter/${n.id}` });
+  }
   return n;
 }
 
