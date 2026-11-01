@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { readiness, type PendingWork as Pending } from "@/lib/pending";
+import { readiness, type PendingWork as Pending } from "@/lib/readiness";
 
 /** What still dies with this person in this repo, plus a readiness score for the handover. */
 export function PendingWork({ slug, login, repoUrl, files }: { slug: string; login: string; repoUrl: string; files: { done: boolean; notes: string }[] }) {
