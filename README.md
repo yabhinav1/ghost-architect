@@ -1,6 +1,109 @@
+<div align="center">
+
+<img src="docs/screenshots/casper-default.png" width="140" alt="Casper, the Ghost-Architect mascot">
+
 # Ghost-Architect
 
-Bus-factor radar for codebases that lost their authors. Paste a public GitHub repo and a list of departed engineers; get a heatmap of the files nobody understands anymore, an evidence-backed brief on why each one exists, and a one-page report for a manager.
+**Find the code nobody understands anymore, before it breaks.**
+
+A bus-factor radar for codebases that lost their authors. It scores every file by how much of it belongs to people who left, explains why risky files exist from commit and pull-request evidence, and runs the handover before the person walks out the door.
+
+[![Live](https://img.shields.io/badge/live-ghost--architect.onrender.com-2ea043?style=for-the-badge&logo=render&logoColor=white)](https://ghost-architect.onrender.com)
+[![Deck](https://img.shields.io/badge/deck-19%20slides-58a6ff?style=for-the-badge&logo=microsoftpowerpoint&logoColor=white)](docs/Ghost-Architect-overview.pptx)
+[![Tests](https://img.shields.io/badge/tests-64%20passing-3fb950?style=for-the-badge&logo=githubactions&logoColor=white)](tests)
+[![Security review](https://img.shields.io/badge/security%20review-done%201%20Nov%202026-a371f7?style=for-the-badge&logo=shield&logoColor=white)](docs/SECURITY-QA.md)
+[![hackCBS](https://img.shields.io/badge/hackCBS-2026-d29922?style=for-the-badge)](https://hackculture.io)
+
+</div>
+
+---
+
+## For judges: everything in one place
+
+| What | Where |
+|---|---|
+| Live product | **https://ghost-architect.onrender.com** (public repos need no sign-in; try `expressjs/express`) |
+| Presentation deck (19 slides, animated) | [docs/Ghost-Architect-overview.pptx](docs/Ghost-Architect-overview.pptx) |
+| Pitch: what, why different, why it matters | [docs/PITCH.md](docs/PITCH.md) |
+| Security questions and honest answers | [docs/SECURITY-QA.md](docs/SECURITY-QA.md) |
+| Demo script, 90 seconds | [Demo script](#demo-script) below |
+| Source | this repository, `src/` (Next.js 16, TypeScript) |
+
+**Try it in one minute:** open the live site, click *Analyse a public repo*, paste `https://github.com/expressjs/express`, switch to **Layoffs** and press *top 3 authors leave*. The heatmap turns red. Open the reddest file and ask Casper why it exists.
+
+## The problem
+
+When an engineer leaves, the code stays and the understanding leaves with them. Layoffs do it to twenty people at once; notice periods give you thirty days and almost nobody uses them well. Six months later someone has to change a file only the departed person understood.
+
+Measured with this tool on `expressjs/express`: 184 contributors, mark the top three as departed, and **78% of all lines** were last touched by someone who is gone.
+
+## What it does
+
+| | |
+|---|---|
+| **Find** | Scores every file by orphan share × recent activity × how many files depend on it. Treemap heatmap, riskiest-files list, generated CODEOWNERS, printable report. |
+| **Explain** | Reads the commits and pull requests behind a file and writes a brief: purpose, claims with evidence links, risks, a safe-change checklist. Every claim is labelled *documented* or *inferred*. |
+| **Hand over** | A manager assigns the leaver's files to a receiver. Notes and links per file, work in flight (open PRs, assigned issues, unmerged branches, their TODOs), notice letters from templates, a countdown to the last day. |
+| **Verify** | A knowledge check written from the leaver's own notes that the receiver must pass, a readiness score 0–100, and a printable day-one packet for the new owner. |
+| **Act** | Work handoffs that add the recipient as a GitHub collaborator or transfer the repository the moment they accept. Email delivery for notices and handoffs. |
+
+## Screenshots
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/landing.png" alt="Landing page"><br><sub><b>Landing.</b> Sign in with GitHub or analyse any public repository without an account.</sub></td>
+<td width="50%"><img src="docs/screenshots/dashboard.png" alt="Dashboard"><br><sub><b>Dashboard.</b> Risk across your repositories: bus factor, top owner, fragile files, riskiest file per repo.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/screenshots/repository.png" alt="Repository analysis"><br><sub><b>Repository.</b> Who left, the orphaned-criticality heatmap, riskiest files, CODEOWNERS and report export, Casper in the corner.</sub></td>
+<td width="50%"><img src="docs/screenshots/inbox-handoff.png" alt="Inbox and work handoff"><br><sub><b>Inbox.</b> Handovers, notices, and work handoffs that can grant GitHub access or transfer ownership on accept.</sub></td>
+</tr>
+</table>
+
+## How it works
+
+<img src="docs/screenshots/slide-architecture.png" alt="Architecture" width="100%">
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/slide-pipeline.png" alt="Analysis pipeline"></td>
+<td width="50%"><img src="docs/screenshots/slide-risk-score.png" alt="Risk score on a real repository"></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/screenshots/slide-handover-intelligence.png" alt="Handover intelligence"></td>
+<td width="50%"><img src="docs/screenshots/slide-security.png" alt="Security design"></td>
+</tr>
+</table>
+
+**The score** (no AI involved): `orphanShare = 0.6 × blame share + 0.4 × recent-commit share by departed authors`, times `log(1 + commits in 12 months)`, times `1 + files that import it`, normalised to 0–100. Deterministic, explainable, identical for everyone looking at the same repository.
+
+**The briefs**: a free model (Groq, `openai/gpt-oss-120b`) reads only the evidence we collected and is told to say *not documented* instead of inventing. Switch the model off and the radar, handovers and work-in-flight still work.
+
+## Why not just use…
+
+| What people use | What it misses |
+|---|---|
+| GitHub blame and Insights | Shows who wrote a line; has no idea who is gone, so no idea what is unowned. |
+| CODEOWNERS | Hand-written, goes stale, still names the person who left. Ours is generated from blame. |
+| Copilot, Cursor | Explain what code does from the code. We explain *why it exists* from the history, with citations. |
+| Notion handover docs | Blank page: nobody knows which 10 of 3,000 files matter. We pick them from data and test the transfer. |
+| CodeScene | The closest cousin, enterprise add-on, stops at the map. We continue into the handover, quiz, packet and countdown. |
+
+## Security in one paragraph
+
+No passwords exist: GitHub OAuth only, with the token kept in an AES-256-GCM sealed httpOnly cookie, never in our store. Every repository request re-checks the viewer's own GitHub access; files are read through `git show` after path validation. Organisations are isolated per request; admins enter one only with audited support access. Rate limits per IP, account and server. An independent adversarial review on 1 November 2026 found 3 high and 5 medium issues, all fixed and verified the same day. Full answers in [docs/SECURITY-QA.md](docs/SECURITY-QA.md).
+
+## Built with
+
+Next.js 16 · React 19 · TypeScript · Tailwind v4 with GitHub Primer tokens (light and dark) · git blame and log · Groq free tier · GitHub OAuth and REST · Brevo email · Render · Upstash (optional). Total monthly cost today: $0.
+
+<div align="center"><img src="docs/screenshots/casper-party.png" width="120" alt="Casper celebrating"><br><sub>Built at hackCBS 2026 by <a href="https://github.com/yabhinav1">@yabhinav1</a> and team.</sub></div>
+
+---
+
+# Operating manual
+
+Everything below is for running and developing the project.
 
 ## Run it
 
