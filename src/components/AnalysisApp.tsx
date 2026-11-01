@@ -61,6 +61,7 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
   const [monthsAgo, setMonthsAgo] = useState(0);
   const [copied, setCopied] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const autoRan = useRef(false);
@@ -538,6 +539,9 @@ export function AnalysisApp({ initialRepo, autoRun = false, user = null }: { ini
 
       {analysis && (
         <Assistant
+          page="repository"
+          open={assistantOpen}
+          onOpenChange={setAssistantOpen}
           repoUrl={analysis.repoUrl}
           context={{
             mode,

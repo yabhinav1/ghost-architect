@@ -28,7 +28,7 @@ export function treemapSvg(files: Scored[], opts: { title: string; subtitle?: st
     parts.push(`<text x="${g.x0 + 4}" y="${g.y0 + 13}" font-size="11" font-family="ui-monospace, Menlo, monospace" fill="#6e7681">${esc(g.data.name)}</text>`);
   }
   for (const d of leaves) {
-    const f = d.data.file!;
+    const f = { score: d.data.score ?? 0 };
     const w = d.x1 - d.x0;
     const h = d.y1 - d.y0;
     parts.push(`<rect x="${d.x0}" y="${d.y0}" width="${w}" height="${h}" rx="2" fill="${scoreColor(f.score)}"/>`);

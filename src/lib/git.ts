@@ -277,13 +277,7 @@ async function coarseOwnership(dir: string, file: string, commitAuthors: Record<
 
 /** Build a map of file -> files it imports, restricted to the analysed set. Resolution rules live in imports.ts. */
 async function importGraph(dir: string, files: string[]): Promise<Map<string, Set<string>>> {
-  const readFile = async (p: string): Promise<string | null> => {
-    try {
-      return await fs.readFile(path.join(dir, p), "utf8");
-    } catch {
-      return null;
-    }
-  };
+  const readFile = (p: string): Promise<string | null> => readBlob(dir, p);
   const ctx = await buildImportContext(files, readFile);
   const edges = new Map<string, Set<string>>();
   await pool(files, 16, async (file) => {
@@ -471,12 +465,24 @@ export async function fileHistory(repoUrl: string, file: string, limit = 25) {
     });
 }
 
+/**
+ * Read a tracked file's bytes through git rather than the filesystem. A tracked symlink
+ * yields its target string instead of being followed, so nothing outside the clone is ever opened.
+ */
+async function readBlob(dir: string, file: string): Promise<string | null> {
+  try {
+    const { stdout } = await run("git", ["show", `HEAD:${file}`], { cwd: dir, maxBuffer: 32 * 1024 * 1024 });
+    return stdout;
+  } catch {
+    return null;
+  }
+}
+
 export async function fileContent(repoUrl: string, file: string, maxLines = 600): Promise<{ text: string; truncated: boolean; totalLines: number }> {
   const safe = assertRepoPath(file);
   const dir = await ensureClone(repoUrl);
-  const full = path.resolve(dir, safe);
-  if (!full.startsWith(path.resolve(dir) + path.sep)) throw new Error("Invalid file path");
-  const text = await fs.readFile(full, "utf8");
+  const text = await readBlob(dir, safe);
+  if (text === null) throw new Error("File not found in the repository");
   const lines = text.split("\n");
   return { text: lines.slice(0, maxLines).join("\n"), truncated: lines.length > maxLines, totalLines: lines.length };
 }
