@@ -55,7 +55,7 @@ export async function GET() {
   if (mail.configured) {
     const v = await verifySmtp();
     const hint = v.ok ? undefined
-      : mail.provider === "brevo" ? "Check BREVO_API_KEY and that MAIL_FROM uses a sender verified in Brevo."
+      : mail.provider === "brevo" ? (/reached|fetch failed|timeout/i.test(v.error ?? "") ? "Brevo's API could not be reached from this host just now; this is a network blip and retries itself within 30 seconds." : "Check BREVO_API_KEY and that MAIL_FROM uses a sender verified in Brevo.")
       : /auth|credentials|535/i.test(v.error ?? "") ? "Gmail rejected the login. Use a 16-character app password (not the account password) from myaccount.google.com/apppasswords, with SMTP_USER set to the same Gmail address."
       : "The SMTP port is blocked or unreachable from this host. Try SMTP_PORT=587; if that also times out the host blocks SMTP, so use Brevo over HTTPS: set BREVO_API_KEY and MAIL_FROM to a sender verified in Brevo.";
     out.mail = { status: v.ok ? mail.provider : `${mail.provider}-failing`, provider: mail.provider, host: mail.provider === "smtp" ? mail.host : undefined, port: mail.provider === "smtp" ? mail.port : undefined, from: mail.from, error: v.error, hint };

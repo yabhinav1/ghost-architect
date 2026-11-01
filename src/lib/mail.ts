@@ -63,11 +63,19 @@ let verified: { at: number; ok: boolean; error?: string } | null = null;
 export async function verifySmtp(): Promise<{ ok: boolean; error?: string }> {
   const c = mailConfig();
   if (c.provider === "none") return { ok: false, error: "No email provider configured" };
-  if (verified && Date.now() - verified.at < 300_000) return verified;
+  // A good result is cached for five minutes; a failure only for thirty seconds so a network blip does not stick.
+  if (verified && Date.now() - verified.at < (verified.ok ? 300_000 : 30_000)) return verified;
   try {
     if (c.provider === "brevo") {
-      const res = await fetch("https://api.brevo.com/v3/account", { headers: { "api-key": c.brevoKey!, Accept: "application/json" }, signal: AbortSignal.timeout(10_000) });
-      if (!res.ok) throw new Error(`Brevo rejected the API key (${res.status})`);
+      let res: Response | null = null;
+      for (let attempt = 0; attempt < 2 && !res; attempt++) {
+        try {
+          res = await fetch("https://api.brevo.com/v3/account", { headers: { "api-key": c.brevoKey!, Accept: "application/json" }, signal: AbortSignal.timeout(10_000) });
+        } catch (e) {
+          if (attempt === 1) throw new Error(`Brevo could not be reached: ${(e as Error).message}`);
+        }
+      }
+      if (!res!.ok) throw new Error(`Brevo rejected the API key (${res!.status})`);
       verified = { at: Date.now(), ok: true };
     } else {
       await smtp()!.verify();
@@ -89,11 +97,15 @@ async function deliver(m: Mail): Promise<MailResult> {
   if (!deliverable(m.to)) return { sent: false, via: "outbox", error: "no deliverable address" };
   const c = mailConfig();
   if (c.provider === "brevo") {
-    try {
-      return await sendBrevo(m, c.brevoKey!, c.from);
-    } catch (e) {
-      return { sent: false, via: "brevo", error: (e as Error).message };
+    let last = "";
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await sendBrevo(m, c.brevoKey!, c.from);
+      } catch (e) {
+        last = (e as Error).message;
+      }
     }
+    return { sent: false, via: "brevo", error: `Brevo could not be reached: ${last}` };
   }
   const t = smtp();
   if (t) {
