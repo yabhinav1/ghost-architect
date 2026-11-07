@@ -6,7 +6,7 @@ When an engineer leaves, their code stays and their understanding walks out the 
 
 Every company has this. Layoffs make it happen to twenty people at once. Notice periods give you thirty days to capture what someone knows, and almost nobody uses them well.
 
-## What Ghost-Architect does
+## What Ghost Architect does
 
 Point it at a GitHub repository and tell it who left (or who is leaving). It then:
 
