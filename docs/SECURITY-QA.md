@@ -1,5 +1,4 @@
-# Security: what to say when judges ask
-
+# Security: Frequently asked questions
 Short, true answers. Do not overclaim; the honest gaps are listed at the end and are fine to say out loud.
 
 ## "What database do you use and what is in it?"
